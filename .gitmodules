@@ -1,0 +1,3 @@
+[submodule "vendor/sword"]
+	path = vendor/sword
+	url = https://github.com/rvaser/sword
