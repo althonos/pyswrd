@@ -37,9 +37,6 @@ from sword.reader cimport Reader as _Reader
 from sword.hash cimport Iterator as _HashIterator
 from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as _ScoreMatrixType
 
-cimport pyopal.lib
-from pyopal.lib cimport seq_t, digit_t
-
 import os
 
 # --- C++ constants and helpers -----------------------------------------------
