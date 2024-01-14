@@ -270,7 +270,7 @@ setuptools.setup(
                 os.path.join("vendor", "sword", "src", "kmers.cpp"),
                 os.path.join("vendor", "sword", "src", "reader.cpp"),
                 os.path.join("vendor", "sword", "src", "score_matrix.cpp"),
-                os.path.join("vendor", "sword", "src", "utils.cpp"),
+                # os.path.join("vendor", "sword", "src", "utils.cpp"),
                 os.path.join("pyswrd", "_sword.pyx"),
             ],
             extra_compile_args=[],
