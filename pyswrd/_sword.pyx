@@ -54,8 +54,14 @@ cdef extern from * nogil:
     bool chainEntryDataKey(const ChainEntry& left, const ChainEntry& right) {
         return left.data() > right.data();
     }
+
+    template<typename T>
+    void stable_sort_by_length(T begin, T end) {
+        std::stable_sort(begin, end, chainEntryDataKey);
+    }
     """
     bool chainEntryDataKey(const _ChainEntry& left, const _ChainEntry& right) noexcept
+    void stable_sort_by_length[T](T begin, T end)
 
 cdef uint32_t    kProtBits   = 5
 cdef uint32_t[6] kmerDelMask = [ 0, 0, 0, 0x7fff, 0xFFFFF, 0x1FFFFFF ]
@@ -278,7 +284,7 @@ cdef class HeuristicFilter:
                 self.entries[id_].insert( self.entries[id_].end(), entries_part[id_].begin(), entries_part[id_].end() )
                 entries_part[id_].clear()
 
-                libcpp.algorithm.stable_sort(self.entries[id_].begin(), self.entries[id_].end(), chainEntryDataKey);
+                stable_sort_by_length(self.entries[id_].begin(), self.entries[id_].end())
 
                 if self.entries[id_].size() > self.max_candidates:
                     self.entries[id_].resize(self.max_candidates)
