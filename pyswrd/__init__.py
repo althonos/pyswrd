@@ -5,6 +5,14 @@ __author__ = "Martin Larralde <martin.larralde@embl.de>"
 __license__ = "MIT"
 
 from . import _sword
+from ._sword import (
+    HeuristicFilter,
+    Kmers,
+    ScoreMatrix,
+    ChainSet,
+    FilterScore,
+    FilterResult,
+)
 
 __doc__ = _sword.__doc__
 

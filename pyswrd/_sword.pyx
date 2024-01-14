@@ -17,6 +17,7 @@ References:
 from cython.operator cimport dereference, preincrement
 
 cimport libcpp.algorithm
+cimport libcpp.utility
 from libc.stdint cimport int32_t, uint16_t, uint32_t, uint64_t
 from libcpp cimport bool, nullptr
 from libcpp.pair cimport pair
@@ -86,6 +87,14 @@ cdef class ChainSet:
         if _i < 0 or _i >= self._chains.size():
             raise IndexError(i)
         return self._chains[i].get().data()
+
+    def append(self, str sequence):
+        cdef bytes    seq   = sequence.encode('ascii')
+        cdef uint32_t total = self._chains.size()
+        cdef bytes    name  = str(total).encode()
+        cdef unique_ptr[_Chain] chain = sword.chain.createChain( total, name, len(name), seq, len(seq) )
+        self._chains.push_back(libcpp.utility.move(chain))
+
 
 
 cdef class Reader:
@@ -204,6 +213,7 @@ cdef class HeuristicFilter:
 
         cdef uint32_t min_score = 1 if kmer_length == 3 else 0
 
+        i = 0
         while i < self.queries._chains.size():
             groups += 1
 
@@ -267,6 +277,7 @@ cdef class HeuristicFilter:
 
             for k in range(group_length):
                 id_ = self.queries._chains[i + k].get().id()
+
                 self.entries[id_].insert( self.entries[id_].end(), entries_part[id_].begin(), entries_part[id_].end() )
                 entries_part[id_].clear()
 
@@ -276,7 +287,6 @@ cdef class HeuristicFilter:
                     self.entries[id_].resize(self.max_candidates)
 
             i += group_length
-            print(i)
 
         self.database_size += database_size
 
@@ -291,4 +301,4 @@ cdef class HeuristicFilter:
         return FilterResult(entries=entries, indices=indices, database_size=self.database_size)
 
 
-
+    
