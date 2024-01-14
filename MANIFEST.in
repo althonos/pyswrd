@@ -1,0 +1,15 @@
+include COPYING
+include CHANGELOG.md
+include CONTRIBUTING.md
+include README.md
+
+recursive-include pyswrd            *.py *.pyi *.pxi *.pyx *.pxd *.h py.typed
+recursive-include pyswrd/tests/data *
+
+recursive-include vendor/sword      README.md LICENSE AUTHORS CHANGELOG CMakeLists.txt
+recursive-include vendor/sword      *.cpp *.h *.hpp
+prune                               vendor/sword/vendor
+
+recursive-include pyswrd            *.py *.pyi *.pxi *.pyx *.pxd *.h py.typed
+recursive-exclude pyswrd            *.cpp *.html
+
