@@ -11,13 +11,15 @@ cdef extern from "reader.hpp" nogil:
 cdef extern from "chain.hpp" nogil:
 
     cppclass Chain:
+        uint32_t id_
+        string name_
+        string data_
+
         const uint32_t id() const
         const string& name() const
         const size_t name_length() const
         const string& data() const
         const size_t length() const
-
-        unique_ptr[Chain] createChain(uint32_t id, char* name, uint32_t name_length, char* data, uint32_t data_length)
 
     ctypedef vector[unique_ptr[Chain]] ChainSet 
     unique_ptr[Chain] createChain(uint32_t id, char* name, uint32_t name_length, char* data, uint32_t data_length)
