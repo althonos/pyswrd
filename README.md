@@ -24,40 +24,41 @@
 Searching a sequence inside a database of target sequences involves aligning
 the sequence to all the targets to find the highest scoring ones, which has
 a high computational cost. Several methods have been proposed over the years
-that use a pre-filter to select. In FASTA[\[1\]](#ref1), k-mers are generated from the 
+that use a pre-filter to select. In FASTA[\[1\]](#ref1),
+[k-mers](https://en.wikipedia.org/wiki/K-mer) are generated from the
 query, and then only target sequences containing query k-mers are aligned.
-BLAST[\[2\]](#ref2) refines this approach by using only high-scoring k-mers with respect
-to the alignment scoring matrix. 
+BLAST[\[2\]](#ref2) refines this approach by using only high-scoring k-mers
+with respect to the alignment scoring matrix.
 
-[SWORD](https://github.com/rvaser/sword) proposes a pre-filter built on 
-perfect hashing of short k-mers. The k-mers generated from the query sequence 
-also include k-mers with mismatches (depending on the scoring matrix) to 
-improve sensitivity. When a k-mer is found in a target sequence, SWORD computes 
-the diagonal where it is located. Target sequences are then selected based on the 
+[SWORD](https://github.com/rvaser/sword) proposes a pre-filter built on
+perfect hashing of short k-mers. The k-mers generated from the query sequence
+also include k-mers with mismatches (depending on the scoring matrix) to
+improve sensitivity. When a k-mer is found in a target sequence, SWORD computes
+the diagonal where it is located. Target sequences are then selected based on the
 number of hits they have on the same diagonal. The pairwise alignment
-is then handled by the platform-accelerated [Opal](https://github.com/Martinsos/opal) 
+is then handled by the platform-accelerated [Opal](https://github.com/Martinsos/opal)
 library.
 
-PySWRD is a [Python](https://python.org) module that provides bindings to 
+PySWRD is a [Python](https://python.org) module that provides bindings to
 the heuristic filter part of [SWORD](https://github.com/rvaser/sword)
 using [Cython](https://cython.org/). It implements a user-friendly, Pythonic
-interface to build a heuristic filter, process a database in chunks, and 
+interface to build a heuristic filter, process a database in chunks, and
 produce the indices of targets passing the filter. The resulting indices
-can be used to filter a [PyOpal](https://github.com/althonos/pyopal) database, 
-using [Opal](https://github.com/Martinsos/opal) for pairwise alignment like 
+can be used to filter a [PyOpal](https://github.com/althonos/pyopal) database,
+using [Opal](https://github.com/Martinsos/opal) for pairwise alignment like
 the original C++ implementation.
 
-- **no binary dependency**: PySWRD is distributed as a Python package, so 
+- **no binary dependency**: PySWRD is distributed as a Python package, so
   you can add it as a dependency to your project, and stop worrying about the
   SWORD binary being present on the end-user machine.
 - **no intermediate files**: Everything happens in memory, in a Python object
   you control, so you don't have to invoke the SWORD CLI using a sub-process
   and temporary files.
 - **better portability**: Using only the heuristic filter of SWORD allows
-  the code to be independent of the local CPU features, unlike SWORD and 
-  Opal which require SIMD. PySWRD delegates the SIMD compilation and 
-  dynamic dispatch to PyOpal to make the package easier to install. It 
-  also benefits from the wider platform support of PyOpal compared to 
+  the code to be independent of the local CPU features, unlike SWORD and
+  Opal which require SIMD. PySWRD delegates the SIMD compilation and
+  dynamic dispatch to PyOpal to make the package easier to install. It
+  also benefits from the wider platform support of PyOpal compared to
   the original Opal, featuring support for Windows and for Aarch64 CPUs.
 
 ## 🔧 Installing
@@ -116,7 +117,7 @@ in the [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) format.
 ## ⚖️ License
 
 This library is provided under the [GNU General Public License v3.0](https://choosealicense.com/licenses/gpl-3.0/).
-SWORD was written by [Robert Vaser](https://github.com/rvaser) and is distributed under the terms of the 
+SWORD was written by [Robert Vaser](https://github.com/rvaser) and is distributed under the terms of the
 GPLv3 as well. See `vendor/sword/LICENSE` for more information. SWORD redistributes additional
 libraries under the terms of the [MIT License](https://choosealicense.com/licenses/mit/).
 

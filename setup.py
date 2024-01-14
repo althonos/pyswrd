@@ -169,8 +169,6 @@ class build_ext(_build_ext):
         # add C++11 flags
         if self.compiler.compiler_type in {"unix", "cygwin", "mingw32"}:
             ext.extra_compile_args.append("-std=c++11")
-        elif self.compiler.compiler_type in {"unix", "cygwin", "mingw32"}:
-            ext.extra_compile_args.append("/std:c++11")
 
         # add debug symbols if we are building in debug mode
         if self.debug:
