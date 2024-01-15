@@ -166,9 +166,11 @@ class build_ext(_build_ext):
         # show the compiler being used
         _eprint("building", ext.name, "with", self.compiler.compiler_type, "compiler for platform", self.plat_name)
 
-        # add C++11 flags
+        # add C++17 flags (SWORD requires C++11 but we use <shared_mutex>)
         if self.compiler.compiler_type in {"unix", "cygwin", "mingw32"}:
-            ext.extra_compile_args.append("-std=c++11")
+            ext.extra_compile_args.append("-std=c++17")
+        elif self.compiler_type == "msvc":
+            ext.extra_compile_args.append("/std:c++17")
 
         # add debug symbols if we are building in debug mode
         if self.debug:

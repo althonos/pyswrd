@@ -7,7 +7,7 @@ References:
       *SW#db: GPU-Accelerated Exact Sequence Similarity Database Search*.
       PLoS One. 2015;10(12):e0145857. Published 2015 Dec 31.
       :doi:`10.1371/journal.pone.0145857`.
-    - Vaser R., D. Pavlović, M. Šikić. 
+    - Vaser R., D. Pavlović, M. Šikić.
       *SWORD—a highly efficient protein database search*.
       Bioinformatics, Volume 32, Issue 17, September 2016, Pages i680–i684.
       :doi:`10.1093/bioinformatics/btw445`.
@@ -38,9 +38,14 @@ from sword.chain cimport ChainSet as _ChainSet, Chain as _Chain
 from sword.hash cimport Iterator as _HashIterator
 from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as _ScoreMatrixType
 
+cimport pyopal.lib
+from pyopal.lib cimport digit_t
+
+import operator
 import os
 import functools
 import multiprocessing.pool
+from string import ascii_uppercase
 
 # --- C++ constants and helpers -----------------------------------------------
 
@@ -102,28 +107,119 @@ cdef class KmerGenerator:
         )
 
 
-cdef class Sequences:
+cdef class Sequences(pyopal.lib.Database):
     """A list of sequences.
     """
     cdef _ChainSet _chains
 
+    # --- Magic methods --------------------------------------------------------
+
+    def __cinit__(self):
+        self._chains = _ChainSet()
+
+    def __init__(self, object sequences=()):
+        super().__init__( 
+            sequences, 
+            alphabet=pyopal.lib.Alphabet(ascii_uppercase)
+        )
+
+    def __reduce__(self):
+        return (type(self), ((),), None, iter(self))
+
+    # --- Sequence interface ---------------------------------------------------
+
     def __len__(self):
-        return self._chains.size()
+        with self.lock.read:
+            return self._chains.size()
 
-    def __getitem__(self, ssize_t i):
-        cdef ssize_t _i = i
-        if _i < 0:
-            _i += self._chains.size()
-        if _i < 0 or _i >= self._chains.size():
-            raise IndexError(i)
-        return self._chains[i].get().data()
+    def __getitem__(self, ssize_t index):
+        cdef const _Chain* chain
+        cdef       ssize_t index_ = index
 
-    def append(self, str sequence):
+        with self.lock.read:
+            size = self._chains.size()
+
+            if index_ < 0:
+                index_ += size
+            if index_ < 0 or (<size_t> index_) >= size:
+                raise IndexError(index)
+
+            chain = self._chains[index_].get()
+            return self._decode(<digit_t*> chain.data().data(), chain.length())
+
+    cpdef void clear(self) except *:
+        """Remove all sequences from the database.
+        """
+        with self.lock.write:
+            self._chains.clear()
+            self._pointers.clear()
+            self._lengths.clear()
+
+    cpdef void append(self, object sequence):
+        """Append a single sequence at the end of the sequence list.
+
+        Arguments:
+            sequence (`str` or byte-like object): The new sequence.
+
+        Hint:
+            When inserting several sequences in the list, consider
+            using the `Sequences.extend` method instead so that the
+            internal buffers can reserve space just once for every
+            new sequence.
+
+        Example:
+            >>> db = pyswrd.Sequences(["ATGC", "TTCA"])
+            >>> db.append("AAAA")
+            >>> list(db)
+            ['ATGC', 'TTCA', 'AAAA']
+
+        """
         cdef bytes    seq   = sequence.encode('ascii')
         cdef uint32_t total = self._chains.size()
         cdef bytes    name  = str(total).encode()
         cdef unique_ptr[_Chain] chain = sword.chain.createChain( total, name, len(name), seq, len(seq) )
-        self._chains.push_back(libcpp.utility.move(chain))
+
+        with self.lock.write:
+            self._lengths.push_back(chain.get().length())
+            self._pointers.push_back(<digit_t*> chain.get().data().data())
+            self._chains.push_back(libcpp.utility.move(chain))
+
+    cpdef void extend(self, object sequences) except *:
+        """Extend the sequence list by adding sequences from an iterable.
+
+        Example:
+            >>> db = pyswrd.Sequences(["ATGC"])
+            >>> db.extend(["TTCA", "AAAA", "GGTG"])
+            >>> list(db)
+            ['ATGC', 'TTCA', 'AAAA', 'GGTG']
+
+        """
+        cdef size_t size
+        cdef size_t hint = operator.length_hint(sequences)
+
+        # attempt to reserve space in advance for the new sequences
+        with self.lock.write:
+            size = self._chains.size()
+            if hint > 0:
+                self._chains.reserve(hint + size)
+                self._pointers.reserve(hint + size)
+                self._lengths.reserve(hint + size)
+
+        # append sequences in order
+        for sequence in sequences:
+            self.append(sequence)
+
+    cpdef void reverse(self) except *:
+        raise NotImplementedError("Sequences.reverse")
+
+    cpdef void insert(self, ssize_t index, object sequence):
+        raise NotImplementedError("Sequences.insert")
+
+    cpdef Sequences mask(self, object bitmask):
+        raise NotImplementedError("Sequences.mask")
+
+    cpdef Sequences extract(self, object bitmask):
+        raise NotImplementedError("Sequences.extract")
 
 
 cdef class Scorer:
@@ -194,7 +290,7 @@ cdef class Scorer:
         """`list` of `list` of `int`: The score matrix.
         """
         assert self._sm != nullptr
-       
+
         cdef int  i
         cdef int  j
         cdef int* scores = self._sm.get().data()
@@ -205,7 +301,7 @@ cdef class Scorer:
         ]
 
 cdef class FilterScore:
-    """The score of the heuristic filter for a single target. 
+    """The score of the heuristic filter for a single target.
 
     Attributes:
         index (`int`): The index of the sequence in the target database.
@@ -213,7 +309,7 @@ cdef class FilterScore:
 
     """
     cdef readonly uint32_t index
-    cdef readonly uint32_t score 
+    cdef readonly uint32_t score
 
     def __cinit__(self, uint32_t index, uint32_t score):
         self.index = index
@@ -277,7 +373,7 @@ cdef class HeuristicFilter:
         uint32_t max_short_length = 2000,
     ):
         # NOTE: ported from: preprocDatabase in `database_search.cpp`
-        # FIXME: at the moment doesn't work properly because the chains are 
+        # FIXME: at the moment doesn't work properly because the chains are
         #        not sorted by length.
 
         cdef vector[uint32_t] dst
@@ -294,7 +390,7 @@ cdef class HeuristicFilter:
 
         # split tasks between long and short
         for i in range(database._chains.size()):
-            l = database._chains[i].get().length() 
+            l = database._chains[i].get().length()
             if l > max_short_length:
                 if split == 0:
                     split = i
@@ -320,7 +416,7 @@ cdef class HeuristicFilter:
             if total_length > short_task_size:
                 total_length = 0
                 dst.emplace_back(i + 1)
-        
+
         if dst.back() != split:
             dst.emplace_back(split)
 
@@ -455,11 +551,11 @@ cdef class HeuristicFilter:
         if self.threads > 1:
             splits = list(self._preprocess_database(database))
             score = functools.partial(self._score_chunk, database)
-            self.pool.starmap(score,  zip(splits[:-1], splits[1:]))
+            self.pool.starmap(score,  zip(splits, splits[1:]))
         else:
             self._score_chunk(database, 0, len(database))
         self.database_size += len(database)
-        
+
     cpdef FilterResult finish(self):
 
         self.pool.close()
@@ -474,4 +570,4 @@ cdef class HeuristicFilter:
         return FilterResult(entries=entries, indices=indices, database_size=self.database_size)
 
 
-    
+

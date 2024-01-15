@@ -10,8 +10,6 @@ cdef extern from "<mutex>" namespace "std" nogil:
 
     cdef cppclass unique_lock[Mutex]:
         unique_lock() noexcept
-        unique_lock(unique_lock&& other) noexcept
-        unique_lock(unique_lock&& other) noexcept
         unique_lock(Mutex& m)
 
         void lock()
