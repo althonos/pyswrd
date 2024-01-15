@@ -34,7 +34,6 @@ cimport sword.score_matrix
 from sword.database_search cimport ChainEntry as _ChainEntry, ChainEntrySet as _ChainEntrySet, Indexes as _Indexes
 from sword.kmers cimport Kmers as _Kmers
 from sword.chain cimport ChainSet as _ChainSet, Chain as _Chain
-from sword.reader cimport Reader as _Reader 
 from sword.hash cimport Iterator as _HashIterator
 from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as _ScoreMatrixType
 
@@ -100,21 +99,6 @@ cdef class ChainSet:
         cdef bytes    name  = str(total).encode()
         cdef unique_ptr[_Chain] chain = sword.chain.createChain( total, name, len(name), seq, len(seq) )
         self._chains.push_back(libcpp.utility.move(chain))
-
-
-
-cdef class Reader:
-    cdef shared_ptr[_Reader] _reader
-
-    def __init__(self, path):
-        cdef bytes _path = os.fsencode(path)
-        self._reader = shared_ptr[_Reader](sword.reader.createReader(_path))
-
-    cpdef ChainSet read(self):
-        assert self._reader != nullptr
-        cdef ChainSet s = ChainSet()
-        self._reader.get().read_chains(s._chains, 0)
-        return s
 
 
 cdef class ScoreMatrix:
