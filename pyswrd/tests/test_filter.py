@@ -1,22 +1,22 @@
 import unittest
 
-from .. import HeuristicFilter, ChainSet
+from .. import HeuristicFilter, Sequences
 from . import data
 
 
 class _TestFilter:
     @classmethod
     def setUpClass(cls):
-        cls.o74807 = ChainSet()
+        cls.o74807 = Sequences()
         for record in data.load_records("O74807.fasta"):
             cls.o74807.append(record.seq)
-        cls.sprot15 = ChainSet()
+        cls.sprot15 = Sequences()
         for record in data.load_records("uniprot_sprot15.fasta"):
             cls.sprot15.append(record.seq)
-        cls.sprot196 = ChainSet()
+        cls.sprot196 = Sequences()
         for record in data.load_records("uniprot_sprot196.fasta"):
             cls.sprot196.append(record.seq)
-        cls.sprot12071 = ChainSet()
+        cls.sprot12071 = Sequences()
         for record in data.load_records("uniprot_sprot12071.fasta"):
             cls.sprot12071.append(record.seq)
 

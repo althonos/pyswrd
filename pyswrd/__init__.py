@@ -7,9 +7,9 @@ __license__ = "MIT"
 from . import _sword
 from ._sword import (
     HeuristicFilter,
-    Kmers,
-    ScoreMatrix,
-    ChainSet,
+    KmerGenerator,
+    Scorer,
+    Sequences,
     FilterScore,
     FilterResult,
 )

@@ -70,16 +70,22 @@ cdef uint32_t[6] kmerDelMask = [ 0, 0, 0, 0x7fff, 0xFFFFF, 0x1FFFFFF ]
 
 # --- Python ------------------------------------------------------------------
 
-cdef class Kmers:
+cdef class KmerGenerator:
+    """A generator of k-mers with optional substitutions.
+    """
     cdef shared_ptr[_Kmers] _kmers
 
-    def __init__(self, ScoreMatrix score_matrix, kmer_length = 3, score_threshold = 13):
+    def __init__(self, Scorer scorer, size_t kmer_length = 3, size_t score_threshold = 13):
+        if kmer_length < 3 or kmer_length > 5:
+            raise ValueError(f"kmer_length must be 3, 4 or 5, got: {kmer_length!r}")
         self._kmers = shared_ptr[_Kmers](
-            sword.kmers.createKmers(kmer_length, score_threshold, score_matrix._score_matrix)
+            sword.kmers.createKmers(kmer_length, score_threshold, scorer._sm)
         )
 
 
-cdef class ChainSet:
+cdef class Sequences:
+    """A list of sequences.
+    """
     cdef _ChainSet _chains
 
     def __len__(self):
@@ -101,8 +107,10 @@ cdef class ChainSet:
         self._chains.push_back(libcpp.utility.move(chain))
 
 
-cdef class ScoreMatrix:
-    cdef shared_ptr[_ScoreMatrix] _score_matrix
+cdef class Scorer:
+    """A class storing the scoring matrix and gap parameters for alignments.
+    """
+    cdef shared_ptr[_ScoreMatrix] _sm
 
     def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
         cdef _ScoreMatrixType ty
@@ -110,7 +118,7 @@ cdef class ScoreMatrix:
             ty = sword.score_matrix.kBlosum62
         else:
             raise ValueError(f"unsupported score matrix: {name!r}")
-        self._score_matrix = shared_ptr[_ScoreMatrix](
+        self._sm = shared_ptr[_ScoreMatrix](
             sword.score_matrix.createScoreMatrix(
                 ty,
                 gap_open,
@@ -119,12 +127,33 @@ cdef class ScoreMatrix:
         )
 
     @property
+    def gap_open(self):
+        """`int`: The score penalty for creating a gap.
+        """
+        return self._sm.gap_open()
+
+    @property
+    def gap_extend(self):
+        """`int`: The score penalty for extending a gap.
+        """
+        return self._sm.gap_extend()
+
+    @property
     def name(self):
-        assert self._score_matrix != nullptr
-        return self._score_matrix.get().scorerName().decode()
+        """`str`: The name of the scoring matrix.
+        """
+        assert self._sm != nullptr
+        return self._sm.get().scorerName().decode('ascii')
 
 
 cdef class FilterScore:
+    """The score of the heuristic filter for a single target. 
+
+    Attributes:
+        index (`int`): The index of the sequence in the target database.
+        score (`int`): The score of the sequence.
+
+    """
     cdef readonly uint32_t index
     cdef readonly uint32_t score 
 
@@ -137,65 +166,75 @@ cdef class FilterScore:
 
 
 cdef class FilterResult:
+    """The result of the heuristic filter.
+    """
     cdef readonly uint32_t database_size
     cdef readonly list     entries
     cdef readonly list     indices
 
-    def __init__(self, database_size, entries, indices):
+    def __init__(self, uint32_t database_size, list entries, list indices):
         self.entries = entries
         self.indices = indices
         self.database_size = database_size
 
 
 cdef class HeuristicFilter:
-    cdef readonly Kmers                     kmers
-    cdef readonly ChainSet                  queries
+    """The SWORD heuristic filter for selecting alignment candidates.
+    """
+    cdef readonly Sequences                 queries
+    cdef readonly KmerGenerator             kmers
+    cdef readonly uint32_t                  score_threshold
+
+    cdef readonly uint32_t                  max_candidates
+    cdef          uint32_t                  database_size
+    cdef          _ChainEntrySet            entries
+
+    cdef readonly size_t                    threads
+    cdef readonly object                    pool
     cdef          vector[unique_ptr[mutex]] mutexes
 
-    cdef readonly size_t         threads
-    cdef readonly object         pool
-
-    cdef readonly uint32_t       score_threshold
-    cdef readonly uint32_t       max_candidates
-
-    cdef          uint32_t       database_size
-    cdef          _ChainEntrySet entries
-
-    def __init__(self, ChainSet queries, *, kmer_length: uint32_t = 3, max_candidates: uint32_t = 30000, score_threshold = 13, ScoreMatrix score_matrix = ScoreMatrix(), size_t threads = 0):
+    def __init__(self, Sequences queries, *, kmer_length: uint32_t = 3, max_candidates: uint32_t = 30000, score_threshold = 13, Scorer scorer = Scorer(), size_t threads = 0):
+        # k-mer generation parameter
         self.queries = queries
         self.score_threshold = score_threshold
+        self.kmers = KmerGenerator(scorer, kmer_length, score_threshold)
+        # parameters and buffers for candidate retrieval
         self.max_candidates = max_candidates
-        self.kmers = Kmers(score_matrix, kmer_length, score_threshold)
         self.database_size = 0
         self.entries = _ChainEntrySet(len(self.queries))
-        
+        # parameters for multiprocessing
+        self.threads = threads or os.cpu_count()
+        self.pool = multiprocessing.pool.ThreadPool(self.threads)
         self.mutexes = vector[unique_ptr[mutex]]()
         for i in range(len(self.queries)):
             self.mutexes.push_back( unique_ptr[mutex]( new mutex() ) )
 
-        self.threads = threads or os.cpu_count()
-        self.pool = multiprocessing.pool.ThreadPool(self.threads)
+    def __del__(self):
+        self.pool.close()
+        self.pool.join()
 
     cpdef vector[uint32_t] _preprocess_database(
         self,
-        ChainSet database,
+        Sequences database,
         uint32_t max_short_length = 2000,
     ):
-        #
-        cdef size_t num_threads = self.threads
+        # NOTE: ported from: preprocDatabase in `database_search.cpp`
+        # FIXME: at the moment doesn't work properly because the chains are 
+        #        not sorted by length.
 
-        # ported from: preprocDatabase in `database_search.cpp`
         cdef vector[uint32_t] dst
         cdef uint32_t         i
+        cdef uint64_t         total_length = 0
+        cdef uint64_t         short_total_length = 0
+        cdef uint64_t         long_total_length  = 0
+        cdef uint32_t         split              = 0
+        cdef uint64_t         short_task_size
+        cdef uint64_t         long_task_size
 
         # sort by length (FIXME?)
         # libcpp.algorithm.sort(database._chains.begin(), database._chains.end(), chainLengthKey)
 
         # split tasks between long and short
-        cdef uint64_t short_total_length = 0
-        cdef uint64_t long_total_length  = 0
-        cdef uint32_t split              = 0
-
         for i in range(database._chains.size()):
             l = database._chains[i].get().length() 
             if l > max_short_length:
@@ -211,15 +250,13 @@ cdef class HeuristicFilter:
             split = database._chains.size()
 
         # spread tasks across threads
-        cdef uint64_t short_task_size = short_total_length / num_threads
-        cdef uint64_t long_task_size = long_total_length / num_threads
+        short_task_size = short_total_length / self.threads
+        long_task_size = long_total_length / self.threads
 
-        dst.reserve(2*num_threads + 1)
+        dst.reserve(2*self.threads + 1)
         dst.emplace_back(0)
 
-        #
-        cdef uint64_t total_length = 0
-
+        total_length = 0
         for i in range(split):
             total_length += database._chains[i].get().length()
             if total_length > short_task_size:
@@ -241,7 +278,7 @@ cdef class HeuristicFilter:
 
         return dst
 
-    cpdef void _score_chunk(self, ChainSet database, uint32_t database_start, uint32_t database_end):
+    cpdef void _score_chunk(self, Sequences database, uint32_t database_start, uint32_t database_end):
         cdef uint32_t      kmer
         cdef _HashIterator begin
         cdef _HashIterator end
@@ -356,14 +393,19 @@ cdef class HeuristicFilter:
 
                 i += group_length
 
-    cpdef void score(self, ChainSet database):
-        splits = list(self._preprocess_database(database))
-        score = functools.partial(self._score_chunk, database)
-        self.pool.starmap(score,  zip(splits[:-1], splits[1:]))
-        # self._score_chunk(database, 0, len(database))
+    cpdef void score(self, Sequences database):
+        if self.threads > 1:
+            splits = list(self._preprocess_database(database))
+            score = functools.partial(self._score_chunk, database)
+            self.pool.starmap(score,  zip(splits[:-1], splits[1:]))
+        else:
+            self._score_chunk(database, 0, len(database))
         self.database_size += len(database)
         
     cpdef FilterResult finish(self):
+
+        self.pool.close()
+
         entries = [
             [FilterScore(entry.chain_idx(), entry.data()) for entry in entries]
             for entries in self.entries
