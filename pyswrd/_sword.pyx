@@ -46,6 +46,7 @@ from pyopal.lib cimport digit_t
 import operator
 import os
 import functools
+import threading
 import multiprocessing.pool
 from string import ascii_uppercase
 
@@ -372,7 +373,16 @@ cdef class HeuristicFilter:
     cdef readonly object                    pool
     cdef          vector[unique_ptr[mutex]] mutexes
 
-    def __init__(self, Sequences queries, *, kmer_length: uint32_t = 3, max_candidates: uint32_t = 30000, score_threshold = 13, Scorer scorer = Scorer(), size_t threads = 0):
+    def __init__(
+        self,
+        Sequences queries not None,
+        *,
+        kmer_length: uint32_t = 3,
+        max_candidates: uint32_t = 30000,
+        score_threshold = 13,
+        Scorer scorer = Scorer(),
+        size_t threads = 0
+    ):
         # k-mer generation parameter
         self.queries = queries
         self.score_threshold = score_threshold
@@ -383,11 +393,12 @@ cdef class HeuristicFilter:
         self.database_length = 0
         self.entries = _ChainEntrySet(len(self.queries))
         # parameters for multiprocessing
-        self.threads = threads or os.cpu_count()
-        self.pool = multiprocessing.pool.ThreadPool(self.threads)
+        self.threads = os.cpu_count() if threads == 0 else threads
+        if self.threads > 0:
+            self.pool = multiprocessing.pool.ThreadPool(self.threads)
         self.mutexes = vector[unique_ptr[mutex]]()
         for i in range(len(self.queries)):
-            self.mutexes.push_back( unique_ptr[mutex]( new mutex() ) )
+            self.mutexes.push_back(unique_ptr[mutex](new mutex()))
 
     def __del__(self):
         self.pool.close()
@@ -399,7 +410,7 @@ cdef class HeuristicFilter:
         """
         return self.kmer_generator.scorer
 
-    cpdef vector[uint32_t] _preprocess_database(
+    cpdef vector[uint32_t] _preprocess_database_long_short(
         self,
         Sequences database,
         uint32_t max_short_length = 2000,
@@ -464,71 +475,123 @@ cdef class HeuristicFilter:
 
         return dst
 
+    cpdef vector[uint32_t] _preprocess_database(
+        self,
+        Sequences database,
+    ):
+        cdef vector[uint32_t] dst
+        cdef uint32_t         i
+        cdef uint32_t         task_size
+        cdef uint32_t         task_length  = 0
+        cdef uint64_t         total_length = 0
+        cdef uint32_t         split        = 0
+
+        # compute total length of database sequences
+        for i in range(database._chains.size()):
+            l = database._chains[i].get().length()
+            total_length += l
+
+        # spread tasks equally across threads
+        task_size = total_length / self.threads
+        dst.reserve(self.threads + 1)
+        dst.emplace_back(0)
+
+        # build groups of equal size
+        for i in range(database._chains.size()):
+            task_length += database._chains[i].get().length()
+            if task_length > task_size:
+                task_length = 0
+                dst.emplace_back(i + 1)
+
+        # make sure all the database is covered
+        if dst.back() != database._chains.size():
+            dst.emplace_back(database._chains.size())
+
+        return dst
+
     cpdef void _score_chunk(self, Sequences database, uint32_t database_start, uint32_t database_end):
-        cdef uint32_t      kmer
-        cdef _HashIterator begin
-        cdef _HashIterator end
-        cdef uint32_t      i
-        cdef uint32_t      j
-        cdef uint32_t      k
-        cdef uint32_t      diagonal
-        cdef uint32_t      max_diag_id
-        cdef bool          flag
-
-        cdef uint32_t      database_size = database._chains.size()
-
+        cdef uint32_t           kmer
+        cdef _HashIterator      begin
+        cdef _HashIterator      end
+        cdef uint32_t           i
+        cdef uint32_t           j
+        cdef uint32_t           k
+        cdef uint32_t           id_
+        cdef uint32_t           diagonal
+        cdef uint32_t           max_diag_id
+        cdef bool               flag
         cdef unique_lock[mutex] lock
 
-        cdef _ChainEntrySet entries_part      = _ChainEntrySet(self.queries._chains.size())
-        cdef vector[uint16_t] min_entry_score = vector[uint16_t](self.queries._chains.size())
-        cdef vector[uint16_t] entries_found   = vector[uint16_t](self.queries._chains.size())
+        cdef vector[uint16_t]   scores
+        cdef vector[uint32_t]   score_lengths
+        cdef vector[uint32_t]   score_starts
+        cdef vector[uint16_t]   max_score
 
-        cdef uint32_t id_
+        cdef uint32_t           length
+        cdef uint32_t           max_target_length
+        cdef uint32_t           queries_size      = self.queries._chains.size()
+        cdef uint64_t           database_size     = database._chains.size()
+        cdef _ChainEntrySet     entries_part      = _ChainEntrySet(queries_size)
+        cdef vector[uint16_t]   min_entry_score   = vector[uint16_t](queries_size)
+        cdef vector[uint16_t]   entries_found     = vector[uint16_t](queries_size)
+        cdef uint32_t           kmer_length       = self.kmer_generator._kmers.get().kmer_length()
+        cdef size_t             groups            = 0
+        cdef size_t             group_length      = 0
+        cdef uint32_t           kmer_offset       = kmer_length - 1
+        cdef uint32_t           del_mask          = kmerDelMask[kmer_length]
+        cdef uint32_t           scores_length     = 0
+        cdef uint32_t           max_scores_length = 100000 if kmer_length == 3 else 500000
+        cdef uint32_t           min_score         = 1 if kmer_length == 3 else 0
+
         with nogil:
-            for i in range(self.queries._chains.size()):
+            # Record the minimum score required for each query
+            for i in range(queries_size):
                 id_ = self.queries._chains[i].get().id()
                 lock = unique_lock[mutex](self.mutexes[id_].get()[0])
                 entries_found[i] = self.entries[id_].size()
                 min_entry_score[i] = 65000 if entries_found[i] == 0 else self.entries[id_].back().data()
                 lock.unlock()
 
-        cdef uint32_t length
-        cdef uint32_t kmer_length       = self.kmer_generator._kmers.get().kmer_length()
-        cdef uint32_t max_target_length = dereference(libcpp.algorithm.max_element( database._chains.begin() + database_start, database._chains.begin() + database_end, chainLengthKey )).get().length()
-        cdef size_t   groups            = 0
-        cdef size_t   group_length      = 0
+            # Allocate space to store the scores
+            scores = vector[uint16_t](max_scores_length)
+            score_lengths = vector[uint32_t](queries_size)
+            score_starts = vector[uint32_t](queries_size + 1)
+            max_score = vector[uint16_t](queries_size)
+            score_starts[0] = 0
 
-        cdef uint32_t kmer_offset       = kmer_length - 1
-        cdef uint32_t del_mask          = kmerDelMask[kmer_length]
-        cdef uint32_t scores_length     = 0
-        cdef uint32_t max_scores_length = 100000 if kmer_length == 3 else 500000
+            # Find the largest target sequence in the database chunk
+            max_target_length = (
+                dereference(
+                    libcpp.algorithm.max_element(
+                        database._chains.begin() + database_start,
+                        database._chains.begin() + database_end,
+                        chainLengthKey
+                    )
+                )
+                .get()
+                .length()
+            )
 
-        cdef vector[uint16_t] scores = vector[uint16_t](max_scores_length)
-        cdef vector[uint32_t] score_lengths = vector[uint32_t](self.queries._chains.size())
-        cdef vector[uint32_t] score_starts = vector[uint32_t](self.queries._chains.size() + 1)
-        cdef vector[uint16_t] max_score = vector[uint16_t](self.queries._chains.size())
-        score_starts[0] = 0
-
-        cdef uint32_t min_score = 1 if kmer_length == 3 else 0
-
-        with nogil:
-
+            # Process all queries
             i = 0
-            while i < self.queries._chains.size():
-                groups += 1
+            while i < queries_size:
 
+                groups += 1
                 group_length = 0
                 scores_length = 0
 
-                for j in range(i, self.queries._chains.size()):
+                # Compute how many queries can be processed at the same time
+                for j in range(i, queries_size):
                     length = self.queries._chains[j].get().length() + max_target_length - 2 * kmer_length + 1
                     if scores_length + length > max_scores_length and group_length > 0:
                         break
                     scores_length += length
                     group_length += 1
 
+                # Compute hashes for the query group
                 hash_ = sword.hash.createHash(self.queries._chains, i, group_length, self.kmer_generator._kmers)
 
+                # Compare targets to the hashes
                 for j in range(database_start, database_end):
 
                     for k in range(group_length):
@@ -567,6 +630,7 @@ cdef class HeuristicFilter:
                         max_score[k] = 0
                         libcpp.algorithm.fill_n(&scores[0] + score_starts[k], score_lengths[k], 0)
 
+                # Merge the entries found in the query group with the entries found previously
                 for k in range(group_length):
                     id_ = self.queries._chains[i + k].get().id()
                     lock = unique_lock[mutex](self.mutexes[id_].get()[0])
@@ -577,6 +641,7 @@ cdef class HeuristicFilter:
                         self.entries[id_].resize(self.max_candidates)
                     lock.unlock()
 
+                # Advance to the next group
                 i += group_length
 
     cpdef HeuristicFilter score(self, Sequences database):
