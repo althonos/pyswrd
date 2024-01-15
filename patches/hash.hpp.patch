@@ -1,0 +1,9 @@
+@@ -14,7 +14,7 @@
+ class Kmers;
+ class Hash;
+ 
+-using ChainSet = std::vector<std::unique_ptr<Chain>>;
++using ChainSet = std::vector<std::shared_ptr<Chain>>;
+ 
+ class Hit {
+ public:

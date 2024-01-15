@@ -1,0 +1,9 @@
+@@ -14,7 +14,7 @@
+ class Chain;
+ class Reader;
+ 
+-using ChainSet = std::vector<std::unique_ptr<Chain>>;
++using ChainSet = std::vector<std::shared_ptr<Chain>>;
+ 
+ std::unique_ptr<Reader> createReader(const std::string& path);
+ 

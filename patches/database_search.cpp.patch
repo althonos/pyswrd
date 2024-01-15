@@ -1,0 +1,26 @@
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include <algorithm>
++#include <iostream>
+ 
+ #include "chain.hpp"
+ #include "reader.hpp"
+@@ -56,8 +57,8 @@ bool compareChainEntryDsc(const ChainEntry& left, const ChainEntry& right) {
+ /* ************************************************************************** */
+ /* Chain preproces */
+ 
+-bool compareChainByLengthAsc(const std::unique_ptr<Chain>& left,
+-    const std::unique_ptr<Chain>& right) {
++bool compareChainByLengthAsc(const std::shared_ptr<Chain>& left,
++    const std::shared_ptr<Chain>& right) {
+ 
+     return left->length() < right->length();
+ }
+@@ -349,5 +350,6 @@ uint64_t searchDatabase(Indexes& dst, const std::string& database_path,
+         std::sort(dst[i].begin(), dst[i].end());
+     }
+ 
++    std::cout << "database_cells: " << database_cells << std::endl;
+     return database_cells;
+ }

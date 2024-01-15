@@ -1,0 +1,45 @@
+@@ -79,7 +79,7 @@
+ 
+ /* ************************************************************************** */
+ 
+-void scoreChains(AlignmentSet& dst, const std::unique_ptr<Chain>& query,
++void scoreChains(AlignmentSet& dst, const std::shared_ptr<Chain>& query,
+     std::vector<uint32_t>& indexes, const ChainSet& database, uint32_t database_start,
+     uint32_t algorithm, double max_evalue, std::shared_ptr<EValue> evalue_params,
+     uint32_t max_alignments, std::shared_ptr<ScoreMatrix> scorer) {
+@@ -107,7 +107,7 @@ void scoreChains(AlignmentSet& dst, const std::unique_ptr<Chain>& query,
+     for (i = 0; i < database_length; ++i) {
+         const auto& target = database[indexes[i]];
+         database_[i] = strToUnsignedCharPtr(target->data());
+-        database_lengths[i] = target->length();
++        database_lengths[i] = target->length() + 1;
+     }
+ 
+     auto error = opalSearchDatabase(query_, query_length, database_, database_length,
+@@ -152,7 +152,7 @@ void scoreChains(AlignmentSet& dst, const std::unique_ptr<Chain>& query,
+     }
+ }
+ 
+-void alignChains(AlignmentSet& dst, const std::unique_ptr<Chain>& query,
++void alignChains(AlignmentSet& dst, const std::shared_ptr<Chain>& query,
+     const ChainSet& database, uint32_t algorithm,
+     std::shared_ptr<ScoreMatrix> scorer) {
+ 
+@@ -175,7 +175,7 @@ void alignChains(AlignmentSet& dst, const std::unique_ptr<Chain>& query,
+     for (uint32_t i = 0; i < database_length; ++i) {
+         const auto& target = database[dst[i]->target_id()];
+         database_[i] = strToUnsignedCharPtr(target->data());
+-        database_lengths[i] = target->length();
++        database_lengths[i] = target->data().size();
+     }
+ 
+     auto error = opalSearchDatabase(query_, query_length, database_, database_length,
+@@ -251,7 +251,7 @@ void alignDatabase(std::vector<AlignmentSet>& dst, AlignmentType algorithm_,
+ 
+         for (uint32_t i = database_start; i < database.size(); ++i) {
+             if (used_mask[i] == 0) {
+-                database[i].reset(nullptr);
++                database[i].reset();
+             }
+         }
+ 

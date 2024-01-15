@@ -54,11 +54,11 @@ from string import ascii_uppercase
 
 cdef extern from * nogil:
     """
-    bool chainLengthKey(const std::unique_ptr<Chain>& left, const std::unique_ptr<Chain>& right) {
+    bool chainLengthKey(const std::shared_ptr<Chain>& left, const std::shared_ptr<Chain>& right) {
         return left->length() < right->length();
     }
     """
-    bool chainLengthKey(const unique_ptr[_Chain]& left, const unique_ptr[_Chain]& right) noexcept
+    bool chainLengthKey(const shared_ptr[_Chain]& left, const shared_ptr[_Chain]& right) noexcept
 
 cdef extern from * nogil:
     """
@@ -273,12 +273,12 @@ cdef class Sequences(pyopal.lib.Database):
         cdef bytes    seq   = sequence.encode('ascii')
         cdef uint32_t total = self._chains.size()
         cdef bytes    name  = str(total).encode()
-        cdef unique_ptr[_Chain] chain = sword.chain.createChain( total, name, len(name), seq, len(seq) )
+        cdef shared_ptr[_Chain] chain = shared_ptr[_Chain](sword.chain.createChain( total, name, len(name), seq, len(seq) ))
 
         with self.lock.write:
             self._lengths.push_back(chain.get().length())
             self._pointers.push_back(<digit_t*> chain.get().data().data())
-            self._chains.push_back(libcpp.utility.move(chain))
+            self._chains.push_back(chain)
 
     cpdef void extend(self, object sequences) except *:
         """Extend the sequence list by adding sequences from an iterable.

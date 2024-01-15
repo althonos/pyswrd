@@ -21,7 +21,7 @@ cdef extern from "chain.hpp" nogil:
         const string& data() const
         const size_t length() const
 
-    ctypedef vector[unique_ptr[Chain]] ChainSet 
+    ctypedef vector[shared_ptr[Chain]] ChainSet 
     unique_ptr[Chain] createChain(uint32_t id, char* name, uint32_t name_length, char* data, uint32_t data_length)
     void createChainSet(ChainSet& dst, const string& path)
 

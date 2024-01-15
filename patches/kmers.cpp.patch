@@ -1,0 +1,9 @@
+@@ -46,7 +46,7 @@
+     }
+ }
+ 
+-std::vector<uint32_t> createKmerVector(const std::unique_ptr<Chain>& chain,
++std::vector<uint32_t> createKmerVector(const std::shared_ptr<Chain>& chain,
+     uint32_t kmer_length) {
+ 
+     if (chain->length() < kmer_length) {
