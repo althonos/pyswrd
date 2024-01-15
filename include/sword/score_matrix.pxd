@@ -22,7 +22,7 @@ cdef extern from "score_matrix.hpp" namespace "ScoreMatrixType" nogil:
 cdef extern from "score_matrix.hpp" nogil:
 
     cppclass ScoreMatrix:
-        int* data()
+        # int* data()
         const int* data() const
         ScoreMatrixType type() const
         int32_t gap_open() const

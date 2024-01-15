@@ -15,6 +15,7 @@ References:
 """
 
 from cython.operator cimport dereference, preincrement
+from cpython.buffer cimport PyBUF_FORMAT, PyBUF_READ, PyBUF_WRITE
 
 cimport libcpp.algorithm
 cimport libcpp.utility
@@ -68,6 +69,24 @@ cdef extern from * nogil:
 cdef uint32_t    kProtBits   = 5
 cdef uint32_t[6] kmerDelMask = [ 0, 0, 0, 0x7fff, 0xFFFFF, 0x1FFFFFF ]
 
+# --- Constants ----------------------------------------------------------------
+
+cdef Py_ssize_t[2] _SWORD_SCORE_MATRIX_SHAPE = [
+    sword.score_matrix.num_rows_,
+    sword.score_matrix.num_columns_,
+]
+
+cdef dict _SWORD_SCORE_MATRICES = {
+    "BLOSUM45": <int> sword.score_matrix.kBlosum45,
+    "BLOSUM50": <int> sword.score_matrix.kBlosum50,
+    "BLOSUM62": <int> sword.score_matrix.kBlosum62,
+    "BLOSUM80": <int> sword.score_matrix.kBlosum80,
+    "BLOSUM90": <int> sword.score_matrix.kBlosum90,
+    "PAM30": <int> sword.score_matrix.kPam30,
+    "PAM70": <int> sword.score_matrix.kPam70,
+    "PAM250": <int> sword.score_matrix.kPam250,
+}
+
 # --- Python ------------------------------------------------------------------
 
 cdef class KmerGenerator:
@@ -114,8 +133,8 @@ cdef class Scorer:
 
     def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
         cdef _ScoreMatrixType ty
-        if name == "BLOSUM62":
-            ty = sword.score_matrix.kBlosum62
+        if name in _SWORD_SCORE_MATRICES:
+            ty = <_ScoreMatrixType> <int> _SWORD_SCORE_MATRICES[name]
         else:
             raise ValueError(f"unsupported score matrix: {name!r}")
         self._sm = shared_ptr[_ScoreMatrix](
@@ -126,17 +145,42 @@ cdef class Scorer:
             )
         )
 
+    def __repr__(self):
+        cdef str ty = type(self).__name__
+        return f"{ty}({self.name!r}, gap_open={self.gap_open!r}, gap_extend={self.gap_extend!r})"
+
+    def __reduce__(self):
+        return (type(self), (self.name, self.gap_open, self.gap_extend))
+
+    def __getbuffer__(self, Py_buffer* buffer, int flags):
+        if flags & PyBUF_FORMAT:
+            buffer.format = b"i"
+        else:
+            buffer.format = NULL
+        buffer.buf = self._sm.get().data()
+        buffer.internal = NULL
+        buffer.itemsize = sizeof(int)
+        buffer.len = sword.score_matrix.num_rows_ * sword.score_matrix.num_columns_ * sizeof(int)
+        buffer.ndim = 2
+        buffer.obj = self
+        buffer.readonly = 1
+        buffer.shape = <Py_ssize_t*> _SWORD_SCORE_MATRIX_SHAPE
+        buffer.suboffsets = NULL
+        buffer.strides = NULL
+
     @property
     def gap_open(self):
         """`int`: The score penalty for creating a gap.
         """
-        return self._sm.gap_open()
+        assert self._sm != nullptr
+        return self._sm.get().gap_open()
 
     @property
     def gap_extend(self):
         """`int`: The score penalty for extending a gap.
         """
-        return self._sm.gap_extend()
+        assert self._sm != nullptr
+        return self._sm.get().gap_extend()
 
     @property
     def name(self):
@@ -145,6 +189,20 @@ cdef class Scorer:
         assert self._sm != nullptr
         return self._sm.get().scorerName().decode('ascii')
 
+    @property
+    def matrix(self):
+        """`list` of `list` of `int`: The score matrix.
+        """
+        assert self._sm != nullptr
+       
+        cdef int  i
+        cdef int  j
+        cdef int* scores = self._sm.get().data()
+
+        return [
+            [ scores[i*sword.score_matrix.num_columns_ + j] for j in range( sword.score_matrix.num_columns_ ) ]
+            for i in range(sword.score_matrix.num_rows_)
+        ]
 
 cdef class FilterScore:
     """The score of the heuristic filter for a single target. 
