@@ -98,7 +98,7 @@ cdef pyopal.lib.Alphabet _SWORD_ALPHABET = pyopal.lib.Alphabet(
     ascii_uppercase
 )
 
-# --- Python ------------------------------------------------------------------
+# --- Parameters ---------------------------------------------------------------
 
 cdef class KmerGenerator:
     """A generator of k-mers with optional substitutions.
@@ -114,6 +114,96 @@ cdef class KmerGenerator:
             sword.kmers.createKmers(kmer_length, score_threshold, scorer._sm)
         )
 
+cdef class Scorer:
+    """A class storing the scoring matrix and gap parameters for alignments.
+    """
+    cdef          shared_ptr[_ScoreMatrix] _sm
+    cdef readonly pyopal.lib.ScoreMatrix   score_matrix
+
+    def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
+        cdef _ScoreMatrixType ty
+        if name in _SWORD_SCORE_MATRICES:
+            ty = <_ScoreMatrixType> <int> _SWORD_SCORE_MATRICES[name]
+        else:
+            raise ValueError(f"unsupported score matrix: {name!r}")
+        self._sm = shared_ptr[_ScoreMatrix](
+            sword.score_matrix.createScoreMatrix(
+                ty,
+                gap_open,
+                gap_extend,
+            )
+        )
+
+        cdef int* scores = self._sm.get().data()
+        self.score_matrix = pyopal.lib.ScoreMatrix(
+            alphabet=_SWORD_ALPHABET, 
+            matrix = [
+                [ 
+                    scores[i*sword.score_matrix.num_columns_ + j] 
+                    for j in range( sword.score_matrix.num_columns_ ) 
+                ]
+                for i in range(sword.score_matrix.num_rows_)
+            ]
+        )
+
+    def __repr__(self):
+        cdef str ty = type(self).__name__
+        return f"{ty}({self.name!r}, gap_open={self.gap_open!r}, gap_extend={self.gap_extend!r})"
+
+    def __reduce__(self):
+        return (type(self), (self.name, self.gap_open, self.gap_extend))
+
+    def __getbuffer__(self, Py_buffer* buffer, int flags):
+        if flags & PyBUF_FORMAT:
+            buffer.format = b"i"
+        else:
+            buffer.format = NULL
+        buffer.buf = self._sm.get().data()
+        buffer.internal = NULL
+        buffer.itemsize = sizeof(int)
+        buffer.len = sword.score_matrix.num_rows_ * sword.score_matrix.num_columns_ * sizeof(int)
+        buffer.ndim = 2
+        buffer.obj = self
+        buffer.readonly = 1
+        buffer.shape = <Py_ssize_t*> _SWORD_SCORE_MATRIX_SHAPE
+        buffer.suboffsets = NULL
+        buffer.strides = NULL
+
+    @property
+    def gap_open(self):
+        """`int`: The score penalty for creating a gap.
+        """
+        assert self._sm != nullptr
+        return self._sm.get().gap_open()
+
+    @property
+    def gap_extend(self):
+        """`int`: The score penalty for extending a gap.
+        """
+        assert self._sm != nullptr
+        return self._sm.get().gap_extend()
+
+    @property
+    def name(self):
+        """`str`: The name of the scoring matrix.
+        """
+        assert self._sm != nullptr
+        return self._sm.get().scorerName().decode('ascii')
+
+cdef class EValue:
+    """A class for calculating E-values from alignment scores.
+    """
+    cdef readonly Scorer              scorer
+    cdef          shared_ptr[_EValue] _evalue
+
+    def __init__(self, uint64_t database_size, Scorer scorer):
+        self.scorer = scorer
+        self._evalue = shared_ptr[_EValue](sword.evalue.createEValue(database_size, scorer._sm))
+
+    cpdef double calculate(self, int32_t score, uint32_t query_length, uint32_t target_length):
+        return self._evalue.get().calculate(score, query_length, target_length)
+
+# --- Sequence Storage ---------------------------------------------------------
 
 cdef class Sequences(pyopal.lib.Database):
     """A list of sequences.
@@ -230,97 +320,7 @@ cdef class Sequences(pyopal.lib.Database):
         sequences = [ self[i] for i in indices ]
         return Sequences(sequences)
 
-
-cdef class EValue:
-    """A class for calculating E-values from alignment scores.
-    """
-    cdef readonly Scorer              scorer
-    cdef          shared_ptr[_EValue] _evalue
-
-    def __init__(self, uint64_t database_size, Scorer scorer):
-        self.scorer = scorer
-        self._evalue = shared_ptr[_EValue](sword.evalue.createEValue(database_size, scorer._sm))
-
-    cpdef double calculate(self, uint32_t score, uint32_t query_length, uint32_t target_length):
-        return self._evalue.get().calculate(score, query_length, target_length)
-
-
-cdef class Scorer:
-    """A class storing the scoring matrix and gap parameters for alignments.
-    """
-    cdef          shared_ptr[_ScoreMatrix] _sm
-    cdef readonly pyopal.lib.ScoreMatrix   score_matrix
-
-    def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
-        cdef _ScoreMatrixType ty
-        if name in _SWORD_SCORE_MATRICES:
-            ty = <_ScoreMatrixType> <int> _SWORD_SCORE_MATRICES[name]
-        else:
-            raise ValueError(f"unsupported score matrix: {name!r}")
-        self._sm = shared_ptr[_ScoreMatrix](
-            sword.score_matrix.createScoreMatrix(
-                ty,
-                gap_open,
-                gap_extend,
-            )
-        )
-
-        cdef int* scores = self._sm.get().data()
-        self.score_matrix = pyopal.lib.ScoreMatrix(
-            alphabet=_SWORD_ALPHABET, 
-            matrix = [
-                [ 
-                    scores[i*sword.score_matrix.num_columns_ + j] 
-                    for j in range( sword.score_matrix.num_columns_ ) 
-                ]
-                for i in range(sword.score_matrix.num_rows_)
-            ]
-        )
-
-    def __repr__(self):
-        cdef str ty = type(self).__name__
-        return f"{ty}({self.name!r}, gap_open={self.gap_open!r}, gap_extend={self.gap_extend!r})"
-
-    def __reduce__(self):
-        return (type(self), (self.name, self.gap_open, self.gap_extend))
-
-    def __getbuffer__(self, Py_buffer* buffer, int flags):
-        if flags & PyBUF_FORMAT:
-            buffer.format = b"i"
-        else:
-            buffer.format = NULL
-        buffer.buf = self._sm.get().data()
-        buffer.internal = NULL
-        buffer.itemsize = sizeof(int)
-        buffer.len = sword.score_matrix.num_rows_ * sword.score_matrix.num_columns_ * sizeof(int)
-        buffer.ndim = 2
-        buffer.obj = self
-        buffer.readonly = 1
-        buffer.shape = <Py_ssize_t*> _SWORD_SCORE_MATRIX_SHAPE
-        buffer.suboffsets = NULL
-        buffer.strides = NULL
-
-    @property
-    def gap_open(self):
-        """`int`: The score penalty for creating a gap.
-        """
-        assert self._sm != nullptr
-        return self._sm.get().gap_open()
-
-    @property
-    def gap_extend(self):
-        """`int`: The score penalty for extending a gap.
-        """
-        assert self._sm != nullptr
-        return self._sm.get().gap_extend()
-
-    @property
-    def name(self):
-        """`str`: The name of the scoring matrix.
-        """
-        assert self._sm != nullptr
-        return self._sm.get().scorerName().decode('ascii')
-
+# --- Heuristic Filter ---------------------------------------------------------
 
 cdef class FilterScore:
     """The score of the heuristic filter for a single target.
@@ -600,6 +600,141 @@ cdef class HeuristicFilter:
             sorted([entry.index for entry in x]) for x in entries
         ]
         return FilterResult(entries=entries, indices=indices, database_size=self.database_size, database_length=self.database_length)
+
+# --- Database Search ---------------------------------------------------------
+
+cdef class Hit:
+    cdef readonly uint32_t              query_index
+    cdef readonly uint32_t              target_index
+    cdef readonly double                evalue
+    cdef readonly pyopal.lib.FullResult result
+
+    def __init__(self, query_index, target_index, evalue, result):
+        self.query_index = query_index
+        self.target_index = target_index
+        self.evalue = evalue
+        self.result = result
+
+    def __repr__(self):
+        cdef str ty = type(self).__name__
+        return f"{ty}(query_index={self.query_index!r}, target_index={self.target_index!r}, evalue={self.evalue!r}, result={self.result!r})"
+
+    @property
+    def score(self):
+        return self.result.score
+
+
+def search(
+    queries,
+    targets,
+    *,
+    gap_open = 10,
+    gap_extend = 1,
+    scorer_name = "BLOSUM62",
+    kmer_length = 3,
+    max_candidates = 30000,
+    score_threshold = 13,
+    max_alignments = 10,
+    max_evalue=10.0,
+    algorithm = "sw",
+    threads = 1,
+):
+    """Run a many-to-many search of query sequences to target sequences.
+
+    This function is a high-level wrapper around the different classes of
+    the `pyswrd` library to support fast searches when all sequences are
+    in memory.
+
+    Arguments:
+        queries (`~pyswrd.Sequences`, or iterable of `str`): The sequences
+            to query the target sequences with.
+        targets (`~pyswrd.Sequences` or iterable of `str`): The sequences
+            to be queries with the query sequences.
+        gap_open (`int`): The penalty for opening a gap in each alignment.
+        gap_extend (`int`): The penalty for extending a gap in each 
+            alignment.
+        scorer_name (`str`): The name of the scoring matrix to use 
+            for scoring each alignment. See `~pyswrd.Scorer` for the
+            list of supported names.
+        kmer_length (`int`): The length of the k-mers to use in the 
+            SWORD heuristic filter. 
+        max_candidates (`int`): The maximum number of candidates to 
+            retain in the heuristic filter.
+        max_evalue (`float`): The E-value threshold above which to 
+            discard sequences before alignment.
+        algorithm (`str`): The algorithm to use to perform pairwise
+            alignment. See `pyopal.Database.search` for more 
+            information.
+        threads (`int`): The number of threads to use to run the 
+            pre-filter. When 0 is given, use all threads on the
+            local machine as reported by `os.cpu_count`.
+
+    Yields:
+        `~pyswrd.Hit`: Hit objects for each hit passing the threshold
+        parameters. Hits are grouped by query index, and sorted by
+        E-value. 
+
+    Example:
+        >>> queries = ["MAGFLKVVQLLAKYGSKAVQWAWANKGKILDWLNAGQAIDWVVSKIKQILGIK"]
+        >>> targets = ([
+        ...     "MESILDLQELETSEEESALMAASTVSNNC",                         
+        ...     "MKKAVIVENKGCATCSIGAACLVDGPIPDFEIAGATGLFGLWG",           
+        ...     "MAGFLKVVQILAKYGSKAVQWAWANKGKILDWINAGQAIDWVVEKIKQILGIK", 
+        ...     "MTQIKVPTALIASVHGEGQHLFEPMAARCTCTTIISSSSTF",             
+        ... ])
+        >>> for hit in pyswrd.search(queries, targets):
+        ...     cigar = hit.result.cigar()
+        ...     print(f"target={hit.target_index} score={hit.score} evalue={hit.evalue:.1g} cigar={cigar}")
+        target=2 score=268 evalue=1e-33 cigar=53M
+
+    """
+    cdef Sequences sub_db
+    cdef Sequences query_db  = queries if isinstance(queries, Sequences) else Sequences(queries)
+    cdef Sequences target_db = targets if isinstance(targets, Sequences) else Sequences(targets)
+
+    cdef Scorer scorer  = Scorer(name=scorer_name, gap_open=gap_open, gap_extend=gap_extend)
+    cdef pyopal.lib.ScoreMatrix score_matrix = scorer.score_matrix
+    cdef HeuristicFilter hfilter = HeuristicFilter(query_db, kmer_length=kmer_length, max_candidates=max_candidates, score_threshold=score_threshold, scorer=scorer, threads=threads)
+
+    cdef FilterResult filter_result = hfilter.score(target_db).finish()
+    cdef EValue evalue = EValue(filter_result.database_length, scorer)
+
+    cdef str query
+    cdef uint32_t query_index
+    cdef uint32_t target_index
+    cdef uint32_t query_length
+    cdef uint32_t target_length
+    cdef double target_evalue
+
+    for query_index, query in enumerate(query_db):
+        # get length of query
+        query_length = len(query)
+        # extract candidates and align them in scoring mode only
+        target_indices = filter_result.indices[query_index]
+        sub_db = target_db.extract(target_indices)
+        score_results = sub_db.search(query, score_matrix, gap_open=gap_open, gap_extend=gap_extend, algorithm=algorithm)
+        # print(score_results)
+        # extract indices with E-value under threshold 
+        target_evalues = []
+        for (result, target_index) in zip(score_results, target_indices):
+            target_length = target_db._lengths[target_index]
+            target_evalue = evalue.calculate(result.score, query_length, target_length)
+            if target_evalue <= max_evalue:
+                target_evalues.append((target_index, target_evalue))
+        # get only `max_alignments` alignments per query, smallest e-values first
+        target_evalues.sort(key=lambda x: x[1])
+        target_evalues = target_evalues[:max_alignments]
+        # align selected sequences
+        sub_db = target_db.extract(target_indices)
+        ali_results = sub_db.search(query, score_matrix, gap_open=gap_open, gap_extend=gap_extend, algorithm=algorithm, mode="full")
+        # return hits for aligned sequences
+        for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
+            yield Hit(
+                query_index=query_index,
+                target_index=target_index,
+                evalue=target_evalue,
+                result=target_result
+            )
 
 
 

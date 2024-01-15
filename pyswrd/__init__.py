@@ -9,9 +9,12 @@ from ._sword import (
     HeuristicFilter,
     KmerGenerator,
     Scorer,
+    EValue,
     Sequences,
     FilterScore,
     FilterResult,
+    Hit,
+    search,
 )
 
 __doc__ = _sword.__doc__
