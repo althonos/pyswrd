@@ -31,11 +31,13 @@ cimport sword.chain
 cimport sword.hash
 cimport sword.kmers
 cimport sword.reader
+cimport sword.evalue
 cimport sword.score_matrix
 from sword.database_search cimport ChainEntry as _ChainEntry, ChainEntrySet as _ChainEntrySet, Indexes as _Indexes
 from sword.kmers cimport Kmers as _Kmers
 from sword.chain cimport ChainSet as _ChainSet, Chain as _Chain
 from sword.hash cimport Iterator as _HashIterator
+from sword.evalue cimport EValue as _EValue
 from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as _ScoreMatrixType
 
 cimport pyopal.lib
@@ -229,6 +231,20 @@ cdef class Sequences(pyopal.lib.Database):
         return Sequences(sequences)
 
 
+cdef class EValue:
+    """A class for calculating E-values from alignment scores.
+    """
+    cdef readonly Scorer              scorer
+    cdef          shared_ptr[_EValue] _evalue
+
+    def __init__(self, uint64_t database_size, Scorer scorer):
+        self.scorer = scorer
+        self._evalue = shared_ptr[_EValue](sword.evalue.createEValue(database_size, scorer._sm))
+
+    cpdef double calculate(self, uint32_t score, uint32_t query_length, uint32_t target_length):
+        return self._evalue.get().calculate(score, query_length, target_length)
+
+
 cdef class Scorer:
     """A class storing the scoring matrix and gap parameters for alignments.
     """
@@ -329,13 +345,15 @@ cdef class FilterResult:
     """The result of the heuristic filter.
     """
     cdef readonly uint32_t database_size
+    cdef readonly uint64_t database_length
     cdef readonly list     entries
     cdef readonly list     indices
 
-    def __init__(self, uint32_t database_size, list entries, list indices):
+    def __init__(self, uint32_t database_size, uint64_t database_length, list entries, list indices):
         self.entries = entries
         self.indices = indices
         self.database_size = database_size
+        self.database_length = database_length
 
 
 cdef class HeuristicFilter:
@@ -347,6 +365,7 @@ cdef class HeuristicFilter:
 
     cdef readonly uint32_t                  max_candidates
     cdef          uint32_t                  database_size
+    cdef          uint64_t                  database_length
     cdef          _ChainEntrySet            entries
 
     cdef readonly size_t                    threads
@@ -361,6 +380,7 @@ cdef class HeuristicFilter:
         # parameters and buffers for candidate retrieval
         self.max_candidates = max_candidates
         self.database_size = 0
+        self.database_length = 0
         self.entries = _ChainEntrySet(len(self.queries))
         # parameters for multiprocessing
         self.threads = threads or os.cpu_count()
@@ -567,6 +587,8 @@ cdef class HeuristicFilter:
         else:
             self._score_chunk(database, 0, len(database))
         self.database_size += len(database)
+        for l in database._lengths:
+            self.database_length += l
         return self
 
     cpdef FilterResult finish(self):
@@ -577,7 +599,7 @@ cdef class HeuristicFilter:
         indices = [
             sorted([entry.index for entry in x]) for x in entries
         ]
-        return FilterResult(entries=entries, indices=indices, database_size=self.database_size)
+        return FilterResult(entries=entries, indices=indices, database_size=self.database_size, database_length=self.database_length)
 
 
 
