@@ -92,6 +92,10 @@ cdef dict _SWORD_SCORE_MATRICES = {
     "PAM250": <int> sword.score_matrix.kPam250,
 }
 
+cdef pyopal.lib.Alphabet _SWORD_ALPHABET = pyopal.lib.Alphabet(
+    ascii_uppercase
+)
+
 # --- Python ------------------------------------------------------------------
 
 cdef class KmerGenerator:
@@ -118,10 +122,7 @@ cdef class Sequences(pyopal.lib.Database):
         self._chains = _ChainSet()
 
     def __init__(self, object sequences=()):
-        super().__init__( 
-            sequences, 
-            alphabet=pyopal.lib.Alphabet(ascii_uppercase)
-        )
+        super().__init__(sequences, alphabet=_SWORD_ALPHABET)
 
     def __reduce__(self):
         return (type(self), ((),), None, iter(self))
@@ -225,7 +226,8 @@ cdef class Sequences(pyopal.lib.Database):
 cdef class Scorer:
     """A class storing the scoring matrix and gap parameters for alignments.
     """
-    cdef shared_ptr[_ScoreMatrix] _sm
+    cdef          shared_ptr[_ScoreMatrix] _sm
+    cdef readonly pyopal.lib.ScoreMatrix   score_matrix
 
     def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
         cdef _ScoreMatrixType ty
@@ -239,6 +241,18 @@ cdef class Scorer:
                 gap_open,
                 gap_extend,
             )
+        )
+
+        cdef int* scores = self._sm.get().data()
+        self.score_matrix = pyopal.lib.ScoreMatrix(
+            alphabet=_SWORD_ALPHABET, 
+            matrix = [
+                [ 
+                    scores[i*sword.score_matrix.num_columns_ + j] 
+                    for j in range( sword.score_matrix.num_columns_ ) 
+                ]
+                for i in range(sword.score_matrix.num_rows_)
+            ]
         )
 
     def __repr__(self):
@@ -285,20 +299,6 @@ cdef class Scorer:
         assert self._sm != nullptr
         return self._sm.get().scorerName().decode('ascii')
 
-    @property
-    def matrix(self):
-        """`list` of `list` of `int`: The score matrix.
-        """
-        assert self._sm != nullptr
-
-        cdef int  i
-        cdef int  j
-        cdef int* scores = self._sm.get().data()
-
-        return [
-            [ scores[i*sword.score_matrix.num_columns_ + j] for j in range( sword.score_matrix.num_columns_ ) ]
-            for i in range(sword.score_matrix.num_rows_)
-        ]
 
 cdef class FilterScore:
     """The score of the heuristic filter for a single target.
