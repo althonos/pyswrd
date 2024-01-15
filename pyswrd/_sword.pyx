@@ -400,10 +400,6 @@ cdef class HeuristicFilter:
         for i in range(len(self.queries)):
             self.mutexes.push_back(unique_ptr[mutex](new mutex()))
 
-    def __del__(self):
-        self.pool.close()
-        self.pool.join()
-
     @property
     def scorer(self):
         """`pyswrd.Scorer`: The scorer used for generating the k-mers.
@@ -657,6 +653,7 @@ cdef class HeuristicFilter:
         return self
 
     cpdef FilterResult finish(self):
+        self.pool.close()
         entries = [
             [FilterScore(entry.chain_idx(), entry.data()) for entry in entries]
             for entries in self.entries
