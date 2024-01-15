@@ -312,14 +312,35 @@ cdef class Sequences(pyopal.lib.Database):
         raise NotImplementedError("Sequences.insert")
 
     cpdef Sequences mask(self, object bitmask):
-        raise NotImplementedError("Sequences.mask")
+        cdef Sequences sequences    = Sequences.__new__(Sequences)
+
+        sequences.alphabet = self.alphabet
+        sequences._search = self._search
+
+        for i, b in enumerate(bitmask):
+            if b:
+                sequences._chains.push_back(self._chains[i])
+                sequences._pointers.push_back(self._pointers[i])
+                sequences._lengths.push_back(self._lengths[i])
+
+        return sequences
 
     cpdef Sequences extract(self, object indices):
-        # FIXME: this causes sequences to be copied and re-encoded,
-        #        SWORD needs to be patched to use `shared_ptr` instead
-        #        of `unique_ptr` in `ChainSet` and associated functions
-        sequences = [ self[i] for i in indices ]
-        return Sequences(sequences)
+        cdef size_t    indices_size = len(indices)
+        cdef Sequences sequences    = Sequences.__new__(Sequences)
+
+        sequences.alphabet = self.alphabet
+        sequences._search = self._search
+        sequences._sequences.reserve(len(indices))
+        sequences._pointers.reserve(len(indices))
+        sequences._lengths.reserve(len(indices))
+
+        for i in indices:
+            sequences._chains.push_back(self._chains[i])
+            sequences._pointers.push_back(self._pointers[i])
+            sequences._lengths.push_back(self._lengths[i])
+
+        return sequences
 
 # --- Heuristic Filter ---------------------------------------------------------
 
