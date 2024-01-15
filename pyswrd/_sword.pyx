@@ -101,9 +101,11 @@ cdef pyopal.lib.Alphabet _SWORD_ALPHABET = pyopal.lib.Alphabet(
 cdef class KmerGenerator:
     """A generator of k-mers with optional substitutions.
     """
-    cdef shared_ptr[_Kmers] _kmers
+    cdef          shared_ptr[_Kmers] _kmers
+    cdef readonly Scorer             scorer
 
     def __init__(self, Scorer scorer, size_t kmer_length = 3, size_t score_threshold = 13):
+        self.scorer = scorer
         if kmer_length < 3 or kmer_length > 5:
             raise ValueError(f"kmer_length must be 3, 4 or 5, got: {kmer_length!r}")
         self._kmers = shared_ptr[_Kmers](
@@ -219,8 +221,12 @@ cdef class Sequences(pyopal.lib.Database):
     cpdef Sequences mask(self, object bitmask):
         raise NotImplementedError("Sequences.mask")
 
-    cpdef Sequences extract(self, object bitmask):
-        raise NotImplementedError("Sequences.extract")
+    cpdef Sequences extract(self, object indices):
+        # FIXME: this causes sequences to be copied and re-encoded,
+        #        SWORD needs to be patched to use `shared_ptr` instead
+        #        of `unique_ptr` in `ChainSet` and associated functions
+        sequences = [ self[i] for i in indices ]
+        return Sequences(sequences)
 
 
 cdef class Scorer:
@@ -336,7 +342,7 @@ cdef class HeuristicFilter:
     """The SWORD heuristic filter for selecting alignment candidates.
     """
     cdef readonly Sequences                 queries
-    cdef readonly KmerGenerator             kmers
+    cdef readonly KmerGenerator             kmer_generator
     cdef readonly uint32_t                  score_threshold
 
     cdef readonly uint32_t                  max_candidates
@@ -351,7 +357,7 @@ cdef class HeuristicFilter:
         # k-mer generation parameter
         self.queries = queries
         self.score_threshold = score_threshold
-        self.kmers = KmerGenerator(scorer, kmer_length, score_threshold)
+        self.kmer_generator = KmerGenerator(scorer, kmer_length, score_threshold)
         # parameters and buffers for candidate retrieval
         self.max_candidates = max_candidates
         self.database_size = 0
@@ -366,6 +372,12 @@ cdef class HeuristicFilter:
     def __del__(self):
         self.pool.close()
         self.pool.join()
+
+    @property
+    def scorer(self):
+        """`pyswrd.Scorer`: The scorer used for generating the k-mers.
+        """
+        return self.kmer_generator.scorer
 
     cpdef vector[uint32_t] _preprocess_database(
         self,
@@ -461,7 +473,7 @@ cdef class HeuristicFilter:
                 lock.unlock()
 
         cdef uint32_t length
-        cdef uint32_t kmer_length       = self.kmers._kmers.get().kmer_length()
+        cdef uint32_t kmer_length       = self.kmer_generator._kmers.get().kmer_length()
         cdef uint32_t max_target_length = dereference(libcpp.algorithm.max_element( database._chains.begin() + database_start, database._chains.begin() + database_end, chainLengthKey )).get().length()
         cdef size_t   groups            = 0
         cdef size_t   group_length      = 0
@@ -495,7 +507,7 @@ cdef class HeuristicFilter:
                     scores_length += length
                     group_length += 1
 
-                hash_ = sword.hash.createHash(self.queries._chains, i, group_length, self.kmers._kmers)
+                hash_ = sword.hash.createHash(self.queries._chains, i, group_length, self.kmer_generator._kmers)
 
                 for j in range(database_start, database_end):
 

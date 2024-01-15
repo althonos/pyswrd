@@ -63,7 +63,7 @@ the original C++ implementation.
 
 ## 🔧 Installing
 
-PySWRD is available for all modern versions (3.6+).
+PySWRD is available for all modern Python versions (3.6+).
 
 <!-- It can be installed directly from [PyPI](https://pypi.org/project/pyswrd/),
 which hosts some pre-built x86-64 and Aarch64 wheels for Linux, MacOS, and
