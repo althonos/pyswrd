@@ -81,11 +81,42 @@ $ conda install -c bioconda pyswrd
 <!-- Check the [*install* page](https://pyswrd.readthedocs.io/en/stable/install.html)
 of the documentation for other ways to install PyOpal on your machine. -->
 
-<!-- ## 💡 Example -->
+## 💡 Example
 
+PySWRD does not provide I/O, so the sequences to be used have to be loaded through
+another library, such as [Biopython](https://biopython.org):
+```python
+import Bio.SeqIO
+query_records = list(Bio.SeqIO.parse("pyswrd/tests/data/uniprot_sprot15.fasta", "fasta"))
+target_records = list(Bio.SeqIO.parse("pyswrd/tests/data/uniprot_sprot12071.fasta", "fasta"))
+```
+
+Use the high-level `search` function, which wraps the internal classes in a single 
+function to quickly run many-to-many searches in the event all your sequences are in 
+memory. It expects the sequences as iterable of Python strings, and yields hits 
+passing E-value and alignment thresholds:
+```python
+import pyswrd
+queries = [str(r.seq) for r in query_records]
+targets = [str(r.seq) for r in target_records]
+for hit in pyswrd.search(queries, targets):
+    print(hit.query_index, hit.target_index, hit.score, hit.evalue)
+```
+
+Different parameters can be passed to `pyswrd.search` and are passed to the 
+SWORD filter and Opal alignment. For instance, to run SWORD in *fast* mode
+instead of the default *sensitive* mode, and using the PAM70 matrix instead
+of BLOSUM62, use:
+```python
+for hit in pyswrd.search(queries, targets, scorer_name="PAM70", score_threshold=0, kmer_length=5):
+    print(hit.query_index, hit.target_index, hit.score, hit.evalue)
+```
+
+<!-- Note that the API of `pyswrd.HeuristicFilter`, used internally, allows 
+processing the target database in chunks, in the event the database 
+cannot fit into memory.  -->
 
 <!-- ## 🧶 Thread-safety -->
-
 
 <!-- ## ⏱️ Benchmarks -->
 
