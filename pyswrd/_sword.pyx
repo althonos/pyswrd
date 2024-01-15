@@ -385,7 +385,7 @@ cdef class HeuristicFilter:
         cdef uint64_t         short_task_size
         cdef uint64_t         long_task_size
 
-        # sort by length (FIXME?)
+        # sort by length (FIXME!)
         # libcpp.algorithm.sort(database._chains.begin(), database._chains.end(), chainLengthKey)
 
         # split tasks between long and short
@@ -547,7 +547,7 @@ cdef class HeuristicFilter:
 
                 i += group_length
 
-    cpdef void score(self, Sequences database):
+    cpdef HeuristicFilter score(self, Sequences database):
         if self.threads > 1:
             splits = list(self._preprocess_database(database))
             score = functools.partial(self._score_chunk, database)
@@ -555,11 +555,9 @@ cdef class HeuristicFilter:
         else:
             self._score_chunk(database, 0, len(database))
         self.database_size += len(database)
+        return self
 
     cpdef FilterResult finish(self):
-
-        self.pool.close()
-
         entries = [
             [FilterScore(entry.chain_idx(), entry.data()) for entry in entries]
             for entries in self.entries
