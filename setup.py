@@ -15,8 +15,9 @@ import sysconfig
 from distutils.command.clean import clean as _clean
 from distutils.errors import CompileError
 from setuptools.command.build_ext import build_ext as _build_ext
+from setuptools.command.build_clib import build_clib as _build_clib
 from setuptools.command.sdist import sdist as _sdist
-from setuptools.extension import Extension
+from setuptools.extension import Extension, Library
 
 try:
     from Cython.Build import cythonize
@@ -104,6 +105,189 @@ class sdist(_sdist):
         _sdist.run(self)
 
 
+class build_clib(_build_clib):
+    """A custom `build_clib` that makes all C++ class attributes public."""
+
+    # --- Compatibility with `setuptools.Command`
+
+    user_options = _build_clib.user_options + [
+        ("parallel", "j", "number of parallel build jobs"),
+    ]
+
+    def initialize_options(self):
+        _build_clib.initialize_options(self)
+        self.parallel = None
+
+    def finalize_options(self):
+        _build_clib.finalize_options(self)
+        if self.parallel is not None:
+            self.parallel = int(self.parallel)
+
+    # --- Autotools-like helpers ---
+
+    @staticmethod
+    def _apply_patch(s, patch, revert=False):
+        # see https://stackoverflow.com/a/40967337
+        s = s.splitlines(keepends=True)
+        p = patch.splitlines(keepends=True)
+        t = []
+        i = 0
+        sl = 0
+        midx, sign = (1, "+") if not revert else (3, "-")
+        while i < len(p) and p[i].startswith(("---", "+++")):
+            i += 1  # skip header lines
+
+        while i < len(p):
+            match = _HEADER_PATTERN.match(p[i])
+            if not match:
+                raise ValueError("Invalid line in patch: {!r}".format(p[i]))
+            i += 1
+            l = int(match.group(midx)) - 1 + (match.group(midx + 1) == "0")
+            t.extend(s[sl:l])
+            sl = l
+            while i < len(p) and p[i][0] != "@":
+                if i + 1 < len(p) and p[i + 1][0] == "\\":
+                    line = p[i][:-1]
+                    i += 2
+                else:
+                    line = p[i]
+                    i += 1
+                if len(line) > 0:
+                    if line[0] == sign or line[0] == " ":
+                        t += line[1:]
+                    sl += line[0] != sign
+
+        t.extend(s[sl:])
+        return "".join(t)
+
+    def _patch_file(self, input, output):
+        basename = os.path.basename(input)
+        patchname = os.path.realpath(
+            os.path.join(__file__, os.pardir, "patches", "{}.patch".format(basename))
+        )
+        if os.path.exists(patchname):
+            _eprint(
+                "patching", os.path.relpath(input), "with", os.path.relpath(patchname)
+            )
+            with open(patchname, "r") as patchfile:
+                patch = patchfile.read()
+            with open(input, "r") as src:
+                srcdata = src.read()
+            with open(output, "w") as dst:
+                dst.write(self._apply_patch(srcdata, patch))
+        else:
+            self.copy_file(input, output)
+
+    # --- Compatibility with base `build_clib` command ---
+
+    def check_library_list(self, libraries):
+        pass
+
+    def get_library_names(self):
+        return [lib.name for lib in self.libraries]
+
+    def get_source_files(self):
+        return [source for lib in self.libraries for source in lib.sources]
+
+    def get_library(self, name):
+        return next(lib for lib in self.libraries if lib.name == name)
+
+    # --- Build code ---
+
+    def build_libraries(self, libraries):
+        # remove universal compilation flags for OSX
+        if platform.system() == "Darwin":
+            _patch_osx_compiler(self.compiler)
+
+        # build each library only if the sources are outdated
+        self.mkpath(self.build_clib)
+        for library in libraries:
+            libname = self.compiler.library_filename(
+                library.name, output_dir=self.build_clib
+            )
+            self.make_file(library.sources, libname, self.build_library, (library,))
+
+    def build_library(self, library):
+        # show the compiler being used
+        _eprint(
+            "building", library.name, "with", self.compiler.compiler_type, "compiler"
+        )
+
+        # add debug flags if we are building in debug mode
+        if self.debug:
+            if self.compiler.compiler_type in {"unix", "cygwin", "mingw32"}:
+                library.extra_compile_args.append("-g")
+            elif self.compiler.compiler_type == "msvc":
+                library.extra_compile_args.append("/Z7")
+
+        # add C++11 flags
+        if library.language == "c++":
+            if self.compiler.compiler_type in {"unix", "cygwin", "mingw32"}:
+                library.extra_compile_args.append("-std=c++11")
+                library.extra_link_args.append("-Wno-alloc-size-larger-than")
+            elif self.compiler.compiler_type == "msvc":
+                library.extra_compile_args.append("/std:c++11")
+
+        # add Windows flags
+        if self.compiler.compiler_type == "msvc":
+            library.define_macros.append(("WIN32", 1))
+
+        # expose all private members and copy headers to build directory
+        for header in library.depends:
+            output = os.path.join(self.build_clib, os.path.basename(header))
+            self.mkpath(os.path.dirname(output))
+            self.make_file([header], output, self._patch_file, (header, output))
+
+        # copy sources to build directory
+        sources = [
+            os.path.join(self.build_temp, os.path.basename(source))
+            for source in library.sources
+        ]
+        for source, source_copy in zip(library.sources, sources):
+            self.make_file(
+                [source], source_copy, self._patch_file, (source, source_copy)
+            )
+
+        # store compile args
+        compile_args = (
+            None,
+            library.define_macros,
+            library.include_dirs + [self.build_clib],
+            self.debug,
+            library.extra_compile_args,
+            None,
+            library.depends,
+        )
+        # manually prepare sources and get the names of object files
+        objects = [
+            re.sub(r"(.cpp|.c)$", self.compiler.obj_extension, s) for s in sources
+        ]
+        # only compile outdated files
+        with multiprocessing.pool.ThreadPool(self.parallel) as pool:
+            pool.starmap(
+                functools.partial(self._compile_file, compile_args=compile_args),
+                zip(sources, objects),
+            )
+
+        # link into a static library
+        libfile = self.compiler.library_filename(
+            library.name,
+            output_dir=self.build_clib,
+        )
+        self.make_file(
+            objects,
+            libfile,
+            self.compiler.create_static_lib,
+            (objects, library.name, self.build_clib, None, self.debug),
+        )
+
+    def _compile_file(self, source, object, compile_args):
+        self.make_file(
+            [source], object, self.compiler.compile, ([source], *compile_args)
+        )
+
+
+
 class build_ext(_build_ext):
     """A `build_ext` that adds various SIMD flags and defines."""
 
@@ -122,6 +306,15 @@ class build_ext(_build_ext):
         self.target_machine = _detect_target_machine(self.plat_name)
         self.target_system = _detect_target_system(self.plat_name)
         self.target_cpu = _detect_target_cpu(self.plat_name)
+        # transfer arguments to the build_clib method
+        self._clib_cmd = self.get_finalized_command("build_clib")
+        self._clib_cmd.debug = self.debug
+        self._clib_cmd.force = self.force
+        self._clib_cmd.verbose = self.verbose
+        self._clib_cmd.define = self.define
+        self._clib_cmd.include_dirs = self.include_dirs
+        self._clib_cmd.compiler = self.compiler
+        self._clib_cmd.parallel = self.parallel
 
     def _check_getid(self):
         _eprint('checking whether `PyInterpreterState_GetID` is available')
@@ -187,6 +380,17 @@ class build_ext(_build_ext):
         if self._check_getid():
             ext.define_macros.append(("HAS_PYINTERPRETERSTATE_GETID", 1))
 
+        # use the patched headers and compiled library
+        ext.include_dirs.append(self._clib_cmd.build_clib)
+        for libname in ext.libraries:
+            library = self._clib_cmd.get_library(libname)
+            ext.extra_objects.append(
+                self.compiler.library_filename(
+                    library.name,
+                    output_dir=self._clib_cmd.build_clib,
+                )
+            )
+
         # build the rest of the extension as normal
         ext._needs_stub = False
         _build_ext.build_extension(self, ext)
@@ -197,6 +401,10 @@ class build_ext(_build_ext):
             raise RuntimeError(
                 "Cython is required to run `build_ext` command"
             ) from cythonize
+
+        # check build_clib has been run
+        if not self.distribution.have_run.get("build_clib", False):
+            self._clib_cmd.run()
 
         # remove universal compilation flags for OSX
         if platform.system() == "Darwin":
@@ -265,9 +473,9 @@ class clean(_clean):
 # --- Setup ---------------------------------------------------------------------
 
 setuptools.setup(
-    ext_modules=[
-        Extension(
-            "pyswrd._sword",
+    libraries=[
+        Library(
+            "sword",
             language="c++",
             sources=[
                 os.path.join("vendor", "sword", "src", "chain.cpp"),
@@ -276,12 +484,27 @@ setuptools.setup(
                 os.path.join("vendor", "sword", "src", "kmers.cpp"),
                 os.path.join("vendor", "sword", "src", "reader.cpp"),
                 os.path.join("vendor", "sword", "src", "score_matrix.cpp"),
-                # os.path.join("vendor", "sword", "src", "utils.cpp"),
+            ],
+            depends=[
+                os.path.join("vendor", "sword", "src", "chain.hpp"),
+                os.path.join("vendor", "sword", "src", "evalue.hpp"),
+                os.path.join("vendor", "sword", "src", "hash.hpp"),
+                os.path.join("vendor", "sword", "src", "kmers.hpp"),
+                os.path.join("vendor", "sword", "src", "reader.hpp"),
+                os.path.join("vendor", "sword", "src", "score_matrix.hpp"),
+            ]
+        ),
+    ],
+    ext_modules=[
+        Extension(
+            "pyswrd._sword",
+            language="c++",
+            libraries=["sword"],
+            sources=[
                 os.path.join("pyswrd", "_sword.pyx"),
             ],
-            extra_compile_args=[],
             include_dirs=[
-                os.path.join("vendor", "sword", "src"),
+                # os.path.join("vendor", "sword", "src"),
                 "pyswrd",
                 "include",
             ],
@@ -290,6 +513,7 @@ setuptools.setup(
     cmdclass={
         "sdist": sdist,
         "build_ext": build_ext,
+        "build_clib": build_clib,
         "clean": clean,
     },
 )
