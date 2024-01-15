@@ -30,7 +30,7 @@ query, and then only target sequences containing query k-mers are aligned.
 BLAST[\[2\]](#ref2) refines this approach by using only high-scoring k-mers
 with respect to the alignment scoring matrix.
 
-[SWORD](https://github.com/rvaser/sword) proposes a pre-filter built on
+[SWORD](https://github.com/rvaser/sword)[\[3\]](#ref3) proposes a pre-filter built on
 perfect hashing of short k-mers. The k-mers generated from the query sequence
 also include k-mers with mismatches (depending on the scoring matrix) to
 improve sensitivity. When a k-mer is found in a target sequence, SWORD computes

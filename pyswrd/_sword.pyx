@@ -24,6 +24,7 @@ from libcpp.pair cimport pair
 from libcpp.string cimport string
 from libcpp.vector cimport vector
 from libcpp.memory cimport unique_ptr, shared_ptr
+from mutex cimport mutex, unique_lock
 
 cimport sword.chain
 cimport sword.hash
@@ -38,6 +39,8 @@ from sword.hash cimport Iterator as _HashIterator
 from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as _ScoreMatrixType
 
 import os
+import functools
+import multiprocessing.pool
 
 # --- C++ constants and helpers -----------------------------------------------
 
@@ -161,9 +164,12 @@ cdef class FilterResult:
 
 
 cdef class HeuristicFilter:
+    cdef readonly Kmers                     kmers
+    cdef readonly ChainSet                  queries
+    cdef          vector[unique_ptr[mutex]] mutexes
 
-    cdef readonly ChainSet       queries
-    cdef readonly Kmers          kmers
+    cdef readonly size_t         threads
+    cdef readonly object         pool
 
     cdef readonly uint32_t       score_threshold
     cdef readonly uint32_t       max_candidates
@@ -171,41 +177,123 @@ cdef class HeuristicFilter:
     cdef          uint32_t       database_size
     cdef          _ChainEntrySet entries
 
-    def __init__(self, ChainSet queries, *, kmer_length: uint32_t = 3, max_candidates: uint32_t = 30000, score_threshold = 13, ScoreMatrix score_matrix = ScoreMatrix()):
+    def __init__(self, ChainSet queries, *, kmer_length: uint32_t = 3, max_candidates: uint32_t = 30000, score_threshold = 13, ScoreMatrix score_matrix = ScoreMatrix(), size_t threads = 0):
         self.queries = queries
         self.score_threshold = score_threshold
         self.max_candidates = max_candidates
-        
         self.kmers = Kmers(score_matrix, kmer_length, score_threshold)
-        
         self.database_size = 0
         self.entries = _ChainEntrySet(len(self.queries))
+        
+        self.mutexes = vector[unique_ptr[mutex]]()
+        for i in range(len(self.queries)):
+            self.mutexes.push_back( unique_ptr[mutex]( new mutex() ) )
 
-    cpdef void score(self, ChainSet database):
+        self.threads = threads or os.cpu_count()
+        self.pool = multiprocessing.pool.ThreadPool(self.threads)
+
+    cpdef vector[uint32_t] _preprocess_database(
+        self,
+        ChainSet database,
+        uint32_t max_short_length = 2000,
+    ):
+        #
+        cdef size_t num_threads = self.threads
+
+        # ported from: preprocDatabase in `database_search.cpp`
+        cdef vector[uint32_t] dst
+        cdef uint32_t         i
+
+        # sort by length (FIXME?)
+        # libcpp.algorithm.sort(database._chains.begin(), database._chains.end(), chainLengthKey)
+
+        # split tasks between long and short
+        cdef uint64_t short_total_length = 0
+        cdef uint64_t long_total_length  = 0
+        cdef uint32_t split              = 0
+
+        for i in range(database._chains.size()):
+            l = database._chains[i].get().length() 
+            if l > max_short_length:
+                if split == 0:
+                    split = i
+                long_total_length += l
+            else:
+                short_total_length += l
+
+        if short_total_length == 0:
+            split = 0
+        if long_total_length == 0:
+            split = database._chains.size()
+
+        # spread tasks across threads
+        cdef uint64_t short_task_size = short_total_length / num_threads
+        cdef uint64_t long_task_size = long_total_length / num_threads
+
+        dst.reserve(2*num_threads + 1)
+        dst.emplace_back(0)
+
+        #
+        cdef uint64_t total_length = 0
+
+        for i in range(split):
+            total_length += database._chains[i].get().length()
+            if total_length > short_task_size:
+                total_length = 0
+                dst.emplace_back(i + 1)
+        
+        if dst.back() != split:
+            dst.emplace_back(split)
+
+        total_length = 0
+        for i in range(split, database._chains.size()):
+            total_length += database._chains[i].get().length()
+            if total_length > long_task_size:
+                total_length = 0
+                dst.emplace_back(i + 1)
+
+        if dst.back() != database._chains.size():
+            dst.emplace_back(database._chains.size())
+
+        return dst
+
+    cpdef void _score_chunk(self, ChainSet database, uint32_t database_start, uint32_t database_end):
         cdef uint32_t      kmer
         cdef _HashIterator begin
         cdef _HashIterator end
-        
+        cdef uint32_t      i
+        cdef uint32_t      j
+        cdef uint32_t      k
+        cdef uint32_t      diagonal
+        cdef uint32_t      max_diag_id
+        cdef bool          flag
+
         cdef uint32_t      database_size = database._chains.size()
-        cdef uint32_t      database_start = 0
-        cdef uint32_t      database_end   = database_size
+
+        cdef unique_lock[mutex] lock
 
         cdef _ChainEntrySet entries_part      = _ChainEntrySet(self.queries._chains.size())
         cdef vector[uint16_t] min_entry_score = vector[uint16_t](self.queries._chains.size())
         cdef vector[uint16_t] entries_found   = vector[uint16_t](self.queries._chains.size())
 
         cdef uint32_t id_
-        for i in range(self.queries._chains.size()):
-            id_ = self.queries._chains[i].get().id()
-            entries_found[i] = self.entries[id_].size()
-            min_entry_score[i] = 65000 if entries_found[i] == 0 else self.entries[id_].back().data()
+        with nogil:
+            for i in range(self.queries._chains.size()):
+                id_ = self.queries._chains[i].get().id()
+                lock = unique_lock[mutex](self.mutexes[id_].get()[0])
+                entries_found[i] = self.entries[id_].size()
+                min_entry_score[i] = 65000 if entries_found[i] == 0 else self.entries[id_].back().data()
+                lock.unlock()
 
+        cdef uint32_t length
         cdef uint32_t kmer_length       = self.kmers._kmers.get().kmer_length()
-        cdef uint32_t max_target_length = dereference(libcpp.algorithm.max_element(  database._chains.begin() + database_start, database._chains.begin() + database_end, chainLengthKey )).get().length()
+        cdef uint32_t max_target_length = dereference(libcpp.algorithm.max_element( database._chains.begin() + database_start, database._chains.begin() + database_end, chainLengthKey )).get().length()
         cdef size_t   groups            = 0
+        cdef size_t   group_length      = 0
 
         cdef uint32_t kmer_offset       = kmer_length - 1
         cdef uint32_t del_mask          = kmerDelMask[kmer_length]
+        cdef uint32_t scores_length     = 0
         cdef uint32_t max_scores_length = 100000 if kmer_length == 3 else 500000
 
         cdef vector[uint16_t] scores = vector[uint16_t](max_scores_length)
@@ -216,83 +304,81 @@ cdef class HeuristicFilter:
 
         cdef uint32_t min_score = 1 if kmer_length == 3 else 0
 
-        i = 0
-        while i < self.queries._chains.size():
-            groups += 1
+        with nogil:
 
-            group_length = 0
-            scores_length = 0
+            i = 0
+            while i < self.queries._chains.size():
+                groups += 1
 
-            for j in range(i, self.queries._chains.size()):
+                group_length = 0
+                scores_length = 0
 
-                length = self.queries._chains[j].get().length() + max_target_length - 2 * kmer_length + 1
+                for j in range(i, self.queries._chains.size()):
+                    length = self.queries._chains[j].get().length() + max_target_length - 2 * kmer_length + 1
+                    if scores_length + length > max_scores_length and group_length > 0:
+                        break
+                    scores_length += length
+                    group_length += 1
 
-                if scores_length + length > max_scores_length and group_length > 0:
-                    break
+                hash_ = sword.hash.createHash(self.queries._chains, i, group_length, self.kmers._kmers)
 
-                scores_length += length
-                group_length += 1
+                for j in range(database_start, database_end):
 
-            hash_ = sword.hash.createHash(self.queries._chains, i, group_length, self.kmers._kmers)
+                    for k in range(group_length):
+                        score_lengths[k] = self.queries._chains[i + k].get().length() + database._chains[j].get().length() - 2 * kmer_length + 1
+                        score_starts[k + 1] = score_starts[k] + score_lengths[k]
 
-            for j in range(database_start, database_end):
+                    max_diag_id = database._chains[j].get().length() - kmer_length
+                    sequence = database._chains[j].get().data()
+                    kmer = sequence[0]
+
+                    for k in range(1, kmer_offset):
+                        kmer = (kmer << kProtBits) | sequence[k]
+                    for k in range(kmer_offset, sequence.size()):
+                        kmer = ((kmer << kProtBits) | sequence[k]) & del_mask
+                        hash_.get().hits(begin, end, kmer)
+                        while begin != end:
+                            diagonal = max_diag_id + kmer_offset - k + dereference(begin).position() + score_starts[dereference(begin).id()]
+                            scores[diagonal] += 1
+                            if max_score[dereference(begin).id()] < scores[diagonal]:
+                                max_score[dereference(begin).id()] = scores[diagonal]
+                            preincrement(begin)
+
+                    for k in range(group_length):
+                        if max_score[k] <= min_score:
+                            continue
+                        id_ = self.queries._chains[i + k].get().id()
+                        flag = entries_part[id_].size() < self.max_candidates and entries_found[k] < self.max_candidates
+                        if flag or max_score[k] >= min_entry_score[k]:
+                            entries_part[id_].emplace_back(_ChainEntry(database._chains[j].get().id(), max_score[k]))
+                            if min_entry_score[k] > max_score[k]:
+                                min_entry_score[k] = max_score[k]
+
+                    for k in range(group_length):
+                        if max_score[k] == 0:
+                            continue
+                        max_score[k] = 0
+                        libcpp.algorithm.fill_n(&scores[0] + score_starts[k], score_lengths[k], 0)
 
                 for k in range(group_length):
-                    score_lengths[k] = self.queries._chains[i + k].get().length() + database._chains[j].get().length() - 2 * kmer_length + 1
-                    score_starts[k + 1] = score_starts[k] + score_lengths[k]
-
-                sequence = database._chains[j].get().data()
-                kmer = sequence[0]
-
-                for k in range(1, kmer_offset):
-                    kmer = (kmer << kProtBits) | sequence[k]
-
-                max_diag_id = database._chains[j].get().length() - kmer_length
-                for k in range(kmer_offset, sequence.size()):
-                    kmer = ((kmer << kProtBits) | sequence[k]) & del_mask
-                    hash_.get().hits(begin, end, kmer)
-
-                    while begin != end:
-                        diagonal = max_diag_id + kmer_offset - k + dereference(begin).position() + score_starts[dereference(begin).id()]
-                        scores[diagonal] += 1
-                        if max_score[dereference(begin).id()] < scores[diagonal]:
-                            max_score[dereference(begin).id()] = scores[diagonal]
-                        preincrement(begin)
-
-                for k in range(group_length):
-                    if max_score[k] <= min_score:
-                        continue
-
                     id_ = self.queries._chains[i + k].get().id()
-                    flag = entries_part[id_].size() < self.max_candidates and entries_found[k] < self.max_candidates
+                    lock = unique_lock[mutex](self.mutexes[id_].get()[0])
+                    self.entries[id_].insert( self.entries[id_].end(), entries_part[id_].begin(), entries_part[id_].end() )
+                    entries_part[id_].clear()
+                    stable_sort_by_length(self.entries[id_].begin(), self.entries[id_].end())
+                    if self.entries[id_].size() > self.max_candidates:
+                        self.entries[id_].resize(self.max_candidates)
+                    lock.unlock()
 
-                    if flag or max_score[k] >= min_entry_score[k]:
-                        entries_part[id_].emplace_back(_ChainEntry(database._chains[j].get().id(), max_score[k]))
-                        if min_entry_score[k] > max_score[k]:
-                            min_entry_score[k] = max_score[k]
+                i += group_length
 
-                for k in range(group_length):
-                    if max_score[k] == 0:
-                        continue
-                    
-                    max_score[k] = 0
-                    libcpp.algorithm.fill_n(&scores[0] + score_starts[k], score_lengths[k], 0)
-
-            for k in range(group_length):
-                id_ = self.queries._chains[i + k].get().id()
-
-                self.entries[id_].insert( self.entries[id_].end(), entries_part[id_].begin(), entries_part[id_].end() )
-                entries_part[id_].clear()
-
-                stable_sort_by_length(self.entries[id_].begin(), self.entries[id_].end())
-
-                if self.entries[id_].size() > self.max_candidates:
-                    self.entries[id_].resize(self.max_candidates)
-
-            i += group_length
-
-        self.database_size += database_size
-
+    cpdef void score(self, ChainSet database):
+        splits = list(self._preprocess_database(database))
+        score = functools.partial(self._score_chunk, database)
+        self.pool.starmap(score,  zip(splits[:-1], splits[1:]))
+        # self._score_chunk(database, 0, len(database))
+        self.database_size += len(database)
+        
     cpdef FilterResult finish(self):
         entries = [
             [FilterScore(entry.chain_idx(), entry.data()) for entry in entries]
