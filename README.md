@@ -24,19 +24,17 @@
 Searching a sequence inside a database of target sequences involves aligning
 the sequence to all the targets to find the highest scoring ones, which has
 a high computational cost. Several methods have been proposed over the years
-that use a pre-filter to select. In FASTA[\[1\]](#ref1),
-[k-mers](https://en.wikipedia.org/wiki/K-mer) are generated from the
-query, and then only target sequences containing query k-mers are aligned.
-BLAST[\[2\]](#ref2) refines this approach by using only high-scoring k-mers
-with respect to the alignment scoring matrix.
+that use a pre-filter to select. In BLAST[\[1\]](#ref1), k-mers are extracted 
+from the query, and only targets containing high-scoring k-mers, with respect to 
+the scoring matrix, are actually aligned.
 
-[SWORD](https://github.com/rvaser/sword)[\[3\]](#ref3) proposes a pre-filter built on
-perfect hashing of short k-mers. The k-mers generated from the query sequence
-also include k-mers with mismatches (depending on the scoring matrix) to
-improve sensitivity. When a k-mer is found in a target sequence, SWORD computes
-the diagonal where it is located. Target sequences are then selected based on the
+[SWORD](https://github.com/rvaser/sword)[\[2\]](#ref2) proposes a pre-filter built 
+on perfect hashing of short mismatching k-mers. The k-mers generated from the 
+query sequence also include k-mers with mismatches to improve sensitivity. 
+When a k-mer is found in a target sequence, SWORD computes the diagonal where it 
+is located, similarly to FASTA[\[3\]](#ref3). Target sequences are then selected based on the
 number of hits they have on the same diagonal. The pairwise alignment
-is then handled by the platform-accelerated [Opal](https://github.com/Martinsos/opal)
+is then handled by the platform-accelerated [Opal](https://github.com/Martinsos/opal)[\[4\]](#ref4)
 library.
 
 PySWRD is a [Python](https://python.org) module that provides bindings to
@@ -84,21 +82,31 @@ of the documentation for other ways to install PyOpal on your machine. -->
 ## 💡 Example
 
 PySWRD does not provide I/O, so the sequences to be used have to be loaded through
-another library, such as [Biopython](https://biopython.org):
+another library, such as [Biopython](https://biopython.org). PySWRD only requires 
+the sequences to be available as Python strings:
+
 ```python
-import Bio.SeqIO
-query_records = list(Bio.SeqIO.parse("pyswrd/tests/data/uniprot_sprot15.fasta", "fasta"))
-target_records = list(Bio.SeqIO.parse("pyswrd/tests/data/uniprot_sprot12071.fasta", "fasta"))
+targets = [
+    'MAFSAEDVLKEYDRRRRMEALLLSLYYPNDRKLLDYKEWSPPRVQVECPK', 
+    'MSIIGATRLQNDKSDTYSAGPCYAGGCSAFTPRGTCGKDWDLGEQTCASG', 
+    'MASNTVSAQGGSNRPVRDFSNIQDVAQFLLFDPIWNEQPGSIVPWKMNRE', 
+    'MYQAINPCPQSWYGSPQLEREIVCKMSGAPHYPNYYPVHPNALGGAWFDT', 
+    'MARPLLGKTSSVRRRLESLSACSIFFFLRKFCQKMASLVFLNSPVYQMSN'
+]
+queries = [
+    'MASNTVSAQGGSNRPVRDFSNIQDVAQFLLFDPIWNEQPG', 
+    'MSFKVYDPIAELIATQFPTSNPDLQIINNDVLVVSPHKIT', 
+    'MEQVPIKEMRLSDLRPNNKSIDTDLGGTKLVVIGKPGSGK'
+]
 ```
 
 Use the high-level `search` function, which wraps the internal classes in a single 
 function to quickly run many-to-many searches in the event all your sequences are in 
 memory. It expects the sequences as iterable of Python strings, and yields hits 
 passing E-value and alignment thresholds:
+
 ```python
 import pyswrd
-queries = [str(r.seq) for r in query_records]
-targets = [str(r.seq) for r in target_records]
 for hit in pyswrd.search(queries, targets):
     print(hit.query_index, hit.target_index, hit.score, hit.evalue)
 ```
@@ -161,7 +169,7 @@ the [Zeller team](https://github.com/zellerlab).*
 
 ## 📚 References
 
-- <a id="ref1">\[1\]</a> David J. Lipman, William R. Pearson. Rapid and sensitive protein similarity searches. Science. 1985 Mar 22;227(4693):1435-41. [doi:10.1126/science.2983426](https://doi.org/10.1126/science.2983426). [PMID:2983426](https://pubmed.ncbi.nlm.nih.gov/2983426).
-- <a id="ref2">\[2\]</a> Stephen F. Altschul, Warren Gish, Webb Miller, Eugene W. Myers, David J. Lipman. Basic local alignment search tool. J Mol Biol. 1990 Oct 5;215(3):403-10. [doi:10.1016/S0022-2836(05)80360-2](https://doi.org/10.1016/S0022-2836(05)80360-2). [PMID:2231712](https://pubmed.ncbi.nlm.nih.gov/2231712).
-- <a id="ref3">\[3\]</a> Robert Vaser, Dario Pavlović, Mile Šikić. SWORD—a highly efficient protein database search. Bioinformatics, Volume 32, Issue 17, September 2016, Pages i680–i684, [doi:10.1093/bioinformatics/btw445](https://doi.org/10.1093/bioinformatics/btw445).
+- <a id="ref1">\[1\]</a> Stephen F. Altschul, Warren Gish, Webb Miller, Eugene W. Myers, David J. Lipman. Basic local alignment search tool. J Mol Biol. 1990 Oct 5;215(3):403-10. [doi:10.1016/S0022-2836(05)80360-2](https://doi.org/10.1016/S0022-2836(05)80360-2). [PMID:2231712](https://pubmed.ncbi.nlm.nih.gov/2231712).
+- <a id="ref2">\[2\]</a> Robert Vaser, Dario Pavlović, Mile Šikić. SWORD—a highly efficient protein database search. Bioinformatics, Volume 32, Issue 17, September 2016, Pages i680–i684, [doi:10.1093/bioinformatics/btw445](https://doi.org/10.1093/bioinformatics/btw445).
+- <a id="ref3">\[3\]</a> David J. Lipman, William R. Pearson. Rapid and sensitive protein similarity searches. Science. 1985 Mar 22;227(4693):1435-41. [doi:10.1126/science.2983426](https://doi.org/10.1126/science.2983426). [PMID:2983426](https://pubmed.ncbi.nlm.nih.gov/2983426).
 - <a id="ref4">\[4\]</a> Korpar Matija, Martin Šošić, Dino Blažeka, Mile Šikić. SW#db: ‘GPU-Accelerated Exact Sequence Similarity Database Search’. PLoS One. 2015 Dec 31;10(12):e0145857. [doi:10.1371/journal.pone.0145857](https://doi.org/10.1371/journal.pone.0145857). [PMID:26719890](https://pubmed.ncbi.nlm.nih.gov/26719890). [PMC4699916](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4699916/).
