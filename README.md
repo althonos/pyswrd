@@ -63,6 +63,15 @@ the original C++ implementation.
 
 PySWRD is available for all modern Python versions (3.6+).
 
+To install, you need the pre-release of PyOpal, which was refactored
+to make it easier to use with the SWORD data model, and then to 
+compile the package from source:
+
+```console
+$ pip install --pre pyopal
+$ pip install git+https://github.com/althonos/pyswrd
+```
+
 <!-- It can be installed directly from [PyPI](https://pypi.org/project/pyswrd/),
 which hosts some pre-built x86-64 and Aarch64 wheels for Linux, MacOS, and
 Windows, as well as the code required to compile from source with Cython:
