@@ -129,6 +129,14 @@ for hit in pyswrd.search(queries, targets, scorer_name="PAM70", score_threshold=
     print(hit.query_index, hit.target_index, hit.score, hit.evalue)
 ```
 
+By default multithreading is supported, using one thread per CPU on the local
+machine as reported by `os.cpu_count`, but it can be changed with the `threads` 
+argument:
+```python
+for hit in pyswrd.search(queries, targets, threads=1):
+    print(hit.query_index, hit.target_index, hit.score, hit.evalue)
+```
+
 <!-- Note that the API of `pyswrd.HeuristicFilter`, used internally, allows 
 processing the target database in chunks, in the event the database 
 cannot fit into memory.  -->
