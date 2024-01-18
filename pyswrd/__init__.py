@@ -4,6 +4,8 @@ from ._version import __version__
 __author__ = "Martin Larralde <martin.larralde@embl.de>"
 __license__ = "MIT"
 
+from pyopal import Aligner
+
 from . import _sword
 from ._sword import (
     HeuristicFilter,
@@ -98,10 +100,12 @@ def search(
     """
     query_db  = queries if isinstance(queries, Sequences) else Sequences(queries)
     target_db = targets if isinstance(targets, Sequences) else Sequences(targets)
+    target_lengths = target_db.lengths
 
     scorer  = Scorer(name=scorer_name, gap_open=gap_open, gap_extend=gap_extend)
     score_matrix = scorer.score_matrix
     hfilter = HeuristicFilter(query_db, kmer_length=kmer_length, max_candidates=max_candidates, score_threshold=score_threshold, scorer=scorer, threads=threads)
+    aligner = Aligner(score_matrix, gap_open=gap_open, gap_extend=gap_extend)
 
     filter_result = hfilter.score(target_db).finish()
     evalue = EValue(filter_result.database_length, scorer)
@@ -112,21 +116,21 @@ def search(
         # extract candidates and align them in scoring mode only
         target_indices = filter_result.indices[query_index]
         sub_db = target_db.extract(target_indices)
-        score_results = sub_db.search(query, score_matrix, gap_open=gap_open, gap_extend=gap_extend, algorithm=algorithm)
-        # print(score_results)
+        score_results = aligner.align(query, sub_db, algorithm=algorithm, mode="score")
         # extract indices with E-value under threshold
         target_evalues = []
-        for (result, target_index) in zip(score_results, target_indices):
-            target_length = len(target_db[target_index])
+        for result, target_index in zip(score_results, target_indices):
+            target_length = target_lengths[target_index]
             target_evalue = evalue.calculate(result.score, query_length, target_length)
             if target_evalue <= max_evalue:
                 target_evalues.append((target_index, target_evalue))
         # get only `max_alignments` alignments per query, smallest e-values first
         target_evalues.sort(key=lambda x: x[1])
+        target_indices = [x[0] for x in target_evalues]
         target_evalues = target_evalues[:max_alignments]
         # align selected sequences
         sub_db = target_db.extract(target_indices)
-        ali_results = sub_db.search(query, score_matrix, gap_open=gap_open, gap_extend=gap_extend, algorithm=algorithm, mode="full")
+        ali_results = aligner.align(query, sub_db, algorithm=algorithm, mode="full")
         # return hits for aligned sequences
         for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
             yield Hit(
