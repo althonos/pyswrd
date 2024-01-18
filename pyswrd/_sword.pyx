@@ -206,7 +206,7 @@ cdef class EValue:
 
 # --- Sequence Storage ---------------------------------------------------------
 
-cdef class Sequences(pyopal.lib.Database):
+cdef class Sequences(pyopal.lib.BaseDatabase):
     """A list of sequences.
     """
     cdef _ChainSet _chains
@@ -217,7 +217,9 @@ cdef class Sequences(pyopal.lib.Database):
         self._chains = _ChainSet()
 
     def __init__(self, object sequences=()):
-        super().__init__(sequences, alphabet=_SWORD_ALPHABET)
+        super().__init__(alphabet=_SWORD_ALPHABET)
+        self.clear()
+        self.extend(sequences)
 
     def __reduce__(self):
         return (type(self), ((),), None, iter(self))
@@ -312,10 +314,11 @@ cdef class Sequences(pyopal.lib.Database):
         raise NotImplementedError("Sequences.insert")
 
     cpdef Sequences mask(self, object bitmask):
+        cdef size_t    i
+        cdef bool      b
         cdef Sequences sequences    = Sequences.__new__(Sequences)
 
         sequences.alphabet = self.alphabet
-        sequences._search = self._search
 
         for i, b in enumerate(bitmask):
             if b:
@@ -326,12 +329,12 @@ cdef class Sequences(pyopal.lib.Database):
         return sequences
 
     cpdef Sequences extract(self, object indices):
+        cdef size_t    i
         cdef size_t    indices_size = len(indices)
         cdef Sequences sequences    = Sequences.__new__(Sequences)
 
         sequences.alphabet = self.alphabet
-        sequences._search = self._search
-        sequences._sequences.reserve(len(indices))
+        sequences._chains.reserve(len(indices))
         sequences._pointers.reserve(len(indices))
         sequences._lengths.reserve(len(indices))
 
