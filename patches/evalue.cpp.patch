@@ -1,0 +1,10 @@
+@@ -83,9 +83,6 @@
+     tau_ = 2.0 * G * (alphaUn_ - sigma_);
+ 
+     length_ = database_cells;
+-
+-    fprintf(stderr, "Using: lambda = %.3lf, K = %.3lf, H = %.3lf\n",
+-        lambda_, K_, H_);
+ }
+ 
+ double EValue::calculate(int32_t score, uint32_t query_length,
