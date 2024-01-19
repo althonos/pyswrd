@@ -55,6 +55,16 @@ from pyopal import align
 
 cdef extern from * nogil:
     """
+    template<typename T1, typename T2>
+    void stable_sort_by_second(std::vector<std::pair<T1, T2>>& v) {
+        std::stable_sort(v.begin(), v.end(), [](const auto& a, const auto& b) {return a.second < b.second; });
+        // std::stable_sort(begin, end, pairSecondKey);
+    }
+    """
+    void stable_sort_by_second[T1, T2](vector[pair[T1, T2]]& v)
+
+cdef extern from * nogil:
+    """
     bool chainLengthKey(const std::shared_ptr<Chain>& left, const std::shared_ptr<Chain>& right) {
         return left->length() < right->length();
     }
@@ -63,17 +73,11 @@ cdef extern from * nogil:
 
 cdef extern from * nogil:
     """
-    bool chainEntryDataKey(const ChainEntry& left, const ChainEntry& right) {
-        return left.data() > right.data();
-    }
-
-    template<typename T>
-    void stable_sort_by_length(T begin, T end) {
-        std::stable_sort(begin, end, chainEntryDataKey);
+    void stable_sort_by_length(std::vector<ChainEntry>& v) {
+        std::stable_sort(v.begin(), v.end(), [](const auto& a, const auto& b) {return a.data() > b.data(); });
     }
     """
-    bool chainEntryDataKey(const _ChainEntry& left, const _ChainEntry& right) noexcept
-    void stable_sort_by_length[T](T begin, T end)
+    void stable_sort_by_length(vector[_ChainEntry] v)
 
 cdef uint32_t    kProtBits   = 5
 cdef uint32_t[6] kmerDelMask = [ 0, 0, 0, 0x7fff, 0xFFFFF, 0x1FFFFFF ]
@@ -401,7 +405,7 @@ cdef class HeuristicFilter:
         max_candidates: uint32_t = 30000,
         score_threshold = 13,
         Scorer scorer = Scorer(),
-        size_t threads = 0
+        size_t threads = 0,
     ):
         # k-mer generation parameter
         self.queries = queries
@@ -414,7 +418,7 @@ cdef class HeuristicFilter:
         self.entries = _ChainEntrySet(len(self.queries))
         # parameters for multiprocessing
         self.threads = os.cpu_count() if threads == 0 else threads
-        if self.threads > 0:
+        if self.threads > 1:
             self.pool = multiprocessing.pool.ThreadPool(self.threads)
         self.mutexes = vector[unique_ptr[mutex]]()
         for i in range(len(self.queries)):
@@ -652,7 +656,7 @@ cdef class HeuristicFilter:
                     lock = unique_lock[mutex](self.mutexes[id_].get()[0])
                     self.entries[id_].insert( self.entries[id_].end(), entries_part[id_].begin(), entries_part[id_].end() )
                     entries_part[id_].clear()
-                    stable_sort_by_length(self.entries[id_].begin(), self.entries[id_].end())
+                    stable_sort_by_length(self.entries[id_])
                     if self.entries[id_].size() > self.max_candidates:
                         self.entries[id_].resize(self.max_candidates)
                     lock.unlock()
@@ -673,7 +677,8 @@ cdef class HeuristicFilter:
         return self
 
     cpdef FilterResult finish(self):
-        self.pool.close()
+        if self.pool is not None:
+            self.pool.close()
         entries = [
             [FilterScore(entry.chain_idx(), entry.data()) for entry in entries]
             for entries in self.entries
@@ -684,6 +689,8 @@ cdef class HeuristicFilter:
         return FilterResult(entries=entries, indices=indices, database_size=self.database_size, database_length=self.database_length)
 
 # --- Database Search ---------------------------------------------------------
+
+
 
 cdef class Hit:
     cdef readonly uint32_t              query_index
@@ -718,7 +725,7 @@ def search(
     uint32_t max_alignments = 10,
     double max_evalue = 10.0,
     str algorithm = "sw",
-    uint32_t threads = 1,
+    uint32_t threads = 0,
 ):
     """Run a many-to-many search of query sequences to target sequences.
 
@@ -747,8 +754,10 @@ def search(
             alignment. See `pyopal.Database.search` for more
             information.
         threads (`int`): The number of threads to use to run the
-            pre-filter. When 0 is given, use all threads on the
-            local machine as reported by `os.cpu_count`.
+            pre-filter and alignments. If zero is given, uses the 
+            number of CPUs reported by `os.cpu_count`. If one given, 
+            use the main threads for aligning, otherwise spawns a 
+            `multiprocessing.pool.ThreadPool`.
 
     Yields:
         `~pyswrd.Hit`: Hit objects for each hit passing the threshold
@@ -769,18 +778,20 @@ def search(
         target=2 score=268 evalue=1e-33 cigar=53M
 
     """
-    cdef Sequences              query_db
-    cdef Sequences              target_db
-    cdef Scorer                 scorer
-    cdef pyopal.lib.ScoreMatrix score_matrix
-    cdef HeuristicFilter        hfilter
-    cdef EValue                 evalue
-    cdef double                 target_evalue
-    cdef size_t                 query_index
-    cdef size_t                 target_index
-    cdef size_t                 query_length
-    cdef Sequences              sub_db
-    cdef pyopal.lib.FullResult  target_result
+    cdef Sequences                      query_db
+    cdef Sequences                      target_db
+    cdef Scorer                         scorer
+    cdef pyopal.lib.ScoreMatrix         score_matrix
+    cdef HeuristicFilter                hfilter
+    cdef EValue                         evalue
+    cdef double                         target_evalue
+    cdef size_t                         query_index
+    cdef size_t                         target_index
+    cdef size_t                         query_length
+    cdef Sequences                      sub_db
+    cdef pyopal.lib.ScoreResult         score_result
+    cdef pyopal.lib.FullResult          target_result
+    cdef vector[pair[uint32_t, double]] target_evalues
 
     query_db  = queries if isinstance(queries, Sequences) else Sequences(queries)
     target_db = targets if isinstance(targets, Sequences) else Sequences(targets)
@@ -792,6 +803,8 @@ def search(
     filter_result = hfilter.score(target_db).finish()
     evalue = EValue(filter_result.database_length, scorer)
 
+    if threads == 0:
+        threads = os.cpu_count() or 1
     with multiprocessing.pool.ThreadPool(threads) as pool:
         for query_index, query in enumerate(query_db):
             # get length of query
@@ -801,17 +814,19 @@ def search(
             sub_db = target_db.extract(target_indices)
             score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
             # extract indices with E-value under threshold
-            target_evalues = []
-            for result, target_index in zip(score_results, target_indices):
+            target_evalues.clear()
+            for score_result, target_index in zip(score_results, target_indices):
                 target_length = target_db._lengths[target_index]
-                target_evalue = evalue.calculate(result.score, query_length, target_length)
+                target_evalue = evalue.calculate(score_result.score, query_length, target_length)
                 if target_evalue <= max_evalue:
-                    target_evalues.append((target_index, target_evalue))
+                    target_evalues.emplace_back(target_index, target_evalue)
             # get only `max_alignments` alignments per query, smallest e-values first
-            target_evalues.sort(key=lambda x: x[1])
-            target_evalues = target_evalues[:max_alignments]
-            target_indices = [x[0] for x in target_evalues]
+            with nogil:
+                stable_sort_by_second(target_evalues)
+                if target_evalues.size() > max_alignments:
+                    target_evalues.resize(max_alignments)
             # align selected sequences
+            target_indices = [x.first for x in target_evalues]
             sub_db = target_db.extract(target_indices)
             ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
             # return hits for aligned sequences
