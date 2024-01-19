@@ -250,7 +250,7 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
 
     cdef const int* get_lengths(self) except NULL:
         return self._lengths.data()
-    
+
     # --- Sequence interface ---------------------------------------------------
 
     cpdef void clear(self) except *:
@@ -326,7 +326,7 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
         cdef bool      b
         cdef Sequences sequences
         cdef size_t    i
-        
+
         if Mask is object:
             mask_size = len(bitmask)
         else:
@@ -334,7 +334,7 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
 
         if mask_size != len(self):
             raise IndexError(bitmask)
-        
+
         sequences = Sequences.__new__(Sequences)
         sequences.alphabet = self.alphabet
 
@@ -353,23 +353,39 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
         cdef size_t    i
         cdef size_t    indices_size
         cdef Sequences sequences
-
-        if Indices is object:
-            indices_size = len(indices)
-        else:
-            indices_size = indices.size()
+        cdef size_t    size
 
         sequences = Sequences.__new__(Sequences)
         sequences.alphabet = self.alphabet
-        sequences._chains.reserve(len(indices))
-        sequences._pointers.reserve(len(indices))
-        sequences._lengths.reserve(len(indices))
 
-        with nogil(Indices is not object):
-            for i in indices:
-                sequences._chains.push_back(self._chains[i])
-                sequences._pointers.push_back(self._pointers[i])
-                sequences._lengths.push_back(self._lengths[i])
+        with self.lock.read:
+            # get length of database and indices
+            size = self.get_size()
+            if Indices is object:
+                indices_size = len(indices)
+            else:
+                indices_size = indices.size()
+            # reserve exact amount of memory
+            with nogil:
+                sequences._chains.reserve(indices_size)
+                sequences._pointers.reserve(indices_size)
+                sequences._lengths.reserve(indices_size)
+            # recover sequences by index
+            if Indices is object:
+                for i in indices:
+                    if i < 0 or i >= size:
+                        raise IndexError(i)
+                    sequences._chains.push_back(self._chains[i])
+                    sequences._pointers.push_back(self._pointers[i])
+                    sequences._lengths.push_back(self._lengths[i])
+            else:
+                with nogil:
+                    for i in indices:
+                        if i < 0 or i >= size:
+                            raise IndexError(i)
+                        sequences._chains.push_back(self._chains[i])
+                        sequences._pointers.push_back(self._pointers[i])
+                        sequences._lengths.push_back(self._lengths[i])
 
         return sequences
 
@@ -718,8 +734,6 @@ cdef class HeuristicFilter:
 
 # --- Database Search ---------------------------------------------------------
 
-
-
 cdef class Hit:
     cdef readonly uint32_t              query_index
     cdef readonly uint32_t              target_index
@@ -782,9 +796,9 @@ def search(
             alignment. See `pyopal.Database.search` for more
             information.
         threads (`int`): The number of threads to use to run the
-            pre-filter and alignments. If zero is given, uses the 
-            number of CPUs reported by `os.cpu_count`. If one given, 
-            use the main threads for aligning, otherwise spawns a 
+            pre-filter and alignments. If zero is given, uses the
+            number of CPUs reported by `os.cpu_count`. If one given,
+            use the main threads for aligning, otherwise spawns a
             `multiprocessing.pool.ThreadPool`.
 
     Yields:
@@ -816,6 +830,8 @@ def search(
     cdef size_t                         query_index
     cdef size_t                         target_index
     cdef size_t                         query_length
+    cdef size_t                         target_length
+    cdef vector[uint32_t]               target_indices
     cdef Sequences                      sub_db
     cdef pyopal.lib.ScoreResult         score_result
     cdef pyopal.lib.FullResult          target_result
@@ -853,8 +869,10 @@ def search(
                 stable_sort_by_second(target_evalues)
                 if target_evalues.size() > max_alignments:
                     target_evalues.resize(max_alignments)
+                target_indices.clear()
+                for target_pair in target_evalues:
+                    target_indices.push_back(target_pair.first)
             # align selected sequences
-            target_indices = [x.first for x in target_evalues]
             sub_db = target_db.extract(target_indices)
             ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
             # return hits for aligned sequences
