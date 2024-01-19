@@ -769,9 +769,21 @@ def search(
         target=2 score=268 evalue=1e-33 cigar=53M
 
     """
+    cdef Sequences              query_db
+    cdef Sequences              target_db
+    cdef Scorer                 scorer
+    cdef pyopal.lib.ScoreMatrix score_matrix
+    cdef HeuristicFilter        hfilter
+    cdef EValue                 evalue
+    cdef double                 target_evalue
+    cdef size_t                 query_index
+    cdef size_t                 target_index
+    cdef size_t                 query_length
+    cdef Sequences              sub_db
+    cdef pyopal.lib.FullResult  target_result
+
     query_db  = queries if isinstance(queries, Sequences) else Sequences(queries)
     target_db = targets if isinstance(targets, Sequences) else Sequences(targets)
-    target_lengths = target_db.lengths
 
     scorer  = Scorer(name=scorer_name, gap_open=gap_open, gap_extend=gap_extend)
     score_matrix = scorer.score_matrix
@@ -791,14 +803,14 @@ def search(
             # extract indices with E-value under threshold
             target_evalues = []
             for result, target_index in zip(score_results, target_indices):
-                target_length = target_lengths[target_index]
+                target_length = target_db._lengths[target_index]
                 target_evalue = evalue.calculate(result.score, query_length, target_length)
                 if target_evalue <= max_evalue:
                     target_evalues.append((target_index, target_evalue))
             # get only `max_alignments` alignments per query, smallest e-values first
             target_evalues.sort(key=lambda x: x[1])
-            target_indices = [x[0] for x in target_evalues]
             target_evalues = target_evalues[:max_alignments]
+            target_indices = [x[0] for x in target_evalues]
             # align selected sequences
             sub_db = target_db.extract(target_indices)
             ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
