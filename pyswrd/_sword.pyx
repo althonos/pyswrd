@@ -780,32 +780,33 @@ def search(
     filter_result = hfilter.score(target_db).finish()
     evalue = EValue(filter_result.database_length, scorer)
 
-    for query_index, query in enumerate(query_db):
-        # get length of query
-        query_length = len(query)
-        # extract candidates and align them in scoring mode only
-        target_indices = filter_result.indices[query_index]
-        sub_db = target_db.extract(target_indices)
-        score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads)
-        # extract indices with E-value under threshold
-        target_evalues = []
-        for result, target_index in zip(score_results, target_indices):
-            target_length = target_lengths[target_index]
-            target_evalue = evalue.calculate(result.score, query_length, target_length)
-            if target_evalue <= max_evalue:
-                target_evalues.append((target_index, target_evalue))
-        # get only `max_alignments` alignments per query, smallest e-values first
-        target_evalues.sort(key=lambda x: x[1])
-        target_indices = [x[0] for x in target_evalues]
-        target_evalues = target_evalues[:max_alignments]
-        # align selected sequences
-        sub_db = target_db.extract(target_indices)
-        ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads)
-        # return hits for aligned sequences
-        for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
-            yield Hit(
-                query_index=query_index,
-                target_index=target_index,
-                evalue=target_evalue,
-                result=target_result
-            )
+    with multiprocessing.pool.ThreadPool(threads) as pool:
+        for query_index, query in enumerate(query_db):
+            # get length of query
+            query_length = len(query)
+            # extract candidates and align them in scoring mode only
+            target_indices = filter_result.indices[query_index]
+            sub_db = target_db.extract(target_indices)
+            score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
+            # extract indices with E-value under threshold
+            target_evalues = []
+            for result, target_index in zip(score_results, target_indices):
+                target_length = target_lengths[target_index]
+                target_evalue = evalue.calculate(result.score, query_length, target_length)
+                if target_evalue <= max_evalue:
+                    target_evalues.append((target_index, target_evalue))
+            # get only `max_alignments` alignments per query, smallest e-values first
+            target_evalues.sort(key=lambda x: x[1])
+            target_indices = [x[0] for x in target_evalues]
+            target_evalues = target_evalues[:max_alignments]
+            # align selected sequences
+            sub_db = target_db.extract(target_indices)
+            ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
+            # return hits for aligned sequences
+            for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
+                yield Hit(
+                    query_index=query_index,
+                    target_index=target_index,
+                    evalue=target_evalue,
+                    result=target_result
+                )
