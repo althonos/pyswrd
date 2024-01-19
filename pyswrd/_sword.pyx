@@ -211,6 +211,14 @@ cdef class EValue:
 
 # --- Sequence Storage ---------------------------------------------------------
 
+ctypedef fused Indices:
+    object
+    vector[uint32_t]
+
+ctypedef fused Mask:
+    object
+    vector[bool]
+
 cdef class Sequences(pyopal.lib.BaseDatabase):
     """A list of sequences.
     """
@@ -313,35 +321,55 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
     cpdef void insert(self, ssize_t index, object sequence):
         raise NotImplementedError("Sequences.insert")
 
-    cpdef Sequences mask(self, object bitmask):
-        cdef size_t    i
+    cpdef Sequences mask(self, Mask bitmask):
+        cdef size_t    mask_size
         cdef bool      b
-        cdef Sequences sequences    = Sequences.__new__(Sequences)
+        cdef Sequences sequences
+        cdef size_t    i
+        
+        if Mask is object:
+            mask_size = len(bitmask)
+        else:
+            mask_size = bitmask.size()
 
+        if mask_size != len(self):
+            raise IndexError(bitmask)
+        
+        sequences = Sequences.__new__(Sequences)
         sequences.alphabet = self.alphabet
 
-        for i, b in enumerate(bitmask):
-            if b:
-                sequences._chains.push_back(self._chains[i])
-                sequences._pointers.push_back(self._pointers[i])
-                sequences._lengths.push_back(self._lengths[i])
+        with nogil(Mask is not object):
+            i = 0
+            for b in bitmask:
+                if b:
+                    sequences._chains.push_back(self._chains[i])
+                    sequences._pointers.push_back(self._pointers[i])
+                    sequences._lengths.push_back(self._lengths[i])
+                i += 1
 
         return sequences
 
-    cpdef Sequences extract(self, object indices):
+    cpdef Sequences extract(self, Indices indices):
         cdef size_t    i
-        cdef size_t    indices_size = len(indices)
-        cdef Sequences sequences    = Sequences.__new__(Sequences)
+        cdef size_t    indices_size
+        cdef Sequences sequences
 
+        if Indices is object:
+            indices_size = len(indices)
+        else:
+            indices_size = indices.size()
+
+        sequences = Sequences.__new__(Sequences)
         sequences.alphabet = self.alphabet
         sequences._chains.reserve(len(indices))
         sequences._pointers.reserve(len(indices))
         sequences._lengths.reserve(len(indices))
 
-        for i in indices:
-            sequences._chains.push_back(self._chains[i])
-            sequences._pointers.push_back(self._pointers[i])
-            sequences._lengths.push_back(self._lengths[i])
+        with nogil(Indices is not object):
+            for i in indices:
+                sequences._chains.push_back(self._chains[i])
+                sequences._pointers.push_back(self._pointers[i])
+                sequences._lengths.push_back(self._lengths[i])
 
         return sequences
 
