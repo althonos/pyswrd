@@ -4,7 +4,7 @@ from ._version import __version__
 __author__ = "Martin Larralde <martin.larralde@embl.de>"
 __license__ = "MIT"
 
-from pyopal import Aligner
+import pyopal
 
 from . import _sword
 from ._sword import (
@@ -105,7 +105,7 @@ def search(
     scorer  = Scorer(name=scorer_name, gap_open=gap_open, gap_extend=gap_extend)
     score_matrix = scorer.score_matrix
     hfilter = HeuristicFilter(query_db, kmer_length=kmer_length, max_candidates=max_candidates, score_threshold=score_threshold, scorer=scorer, threads=threads)
-    aligner = Aligner(score_matrix, gap_open=gap_open, gap_extend=gap_extend)
+    aligner = pyopal.Aligner(score_matrix, gap_open=gap_open, gap_extend=gap_extend)
 
     filter_result = hfilter.score(target_db).finish()
     evalue = EValue(filter_result.database_length, scorer)
@@ -116,7 +116,7 @@ def search(
         # extract candidates and align them in scoring mode only
         target_indices = filter_result.indices[query_index]
         sub_db = target_db.extract(target_indices)
-        score_results = aligner.align(query, sub_db, algorithm=algorithm, mode="score")
+        score_results = pyopal.align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads)
         # extract indices with E-value under threshold
         target_evalues = []
         for result, target_index in zip(score_results, target_indices):
@@ -130,7 +130,7 @@ def search(
         target_evalues = target_evalues[:max_alignments]
         # align selected sequences
         sub_db = target_db.extract(target_indices)
-        ali_results = aligner.align(query, sub_db, algorithm=algorithm, mode="full")
+        ali_results = pyopal.align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads)
         # return hits for aligned sequences
         for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
             yield Hit(

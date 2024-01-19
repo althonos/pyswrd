@@ -209,7 +209,9 @@ cdef class EValue:
 cdef class Sequences(pyopal.lib.BaseDatabase):
     """A list of sequences.
     """
-    cdef _ChainSet _chains
+    cdef _ChainSet        _chains
+    cdef vector[digit_t*] _pointers
+    cdef vector[int]      _lengths
 
     # --- Magic methods --------------------------------------------------------
 
@@ -224,26 +226,19 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
     def __reduce__(self):
         return (type(self), ((),), None, iter(self))
 
+    # --- Database interface ---------------------------------------------------
+
+    cdef size_t get_size(self) noexcept:
+        return self._chains.size()
+
+    cdef const digit_t** get_sequences(self) except NULL:
+        cdef digit_t** sequences = self._pointers.data()
+        return <const digit_t**> sequences
+
+    cdef const int* get_lengths(self) except NULL:
+        return self._lengths.data()
+    
     # --- Sequence interface ---------------------------------------------------
-
-    def __len__(self):
-        with self.lock.read:
-            return self._chains.size()
-
-    def __getitem__(self, ssize_t index):
-        cdef const _Chain* chain
-        cdef       ssize_t index_ = index
-
-        with self.lock.read:
-            size = self._chains.size()
-
-            if index_ < 0:
-                index_ += size
-            if index_ < 0 or (<size_t> index_) >= size:
-                raise IndexError(index)
-
-            chain = self._chains[index_].get()
-            return self._decode(<digit_t*> chain.data().data(), chain.length())
 
     cpdef void clear(self) except *:
         """Remove all sequences from the database.
