@@ -271,6 +271,14 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
 
     # --- Sequence interface ---------------------------------------------------
 
+    def __getitem__(self, object index):
+        if isinstance(index, slice):
+            with self.lock.read:
+                size = self.get_size()
+                indices = range(*index.indices(size))
+                return self.extract(indices)
+        return super().__getitem__(index)
+
     cpdef void clear(self) except *:
         """Remove all sequences from the database.
         """
@@ -298,10 +306,13 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
             ['ATGC', 'TTCA', 'AAAA']
 
         """
-        cdef bytes    seq   = sequence.encode('ascii')
-        cdef uint32_t total = self._chains.size()
-        cdef bytes    name  = str(total).encode()
-        cdef shared_ptr[_Chain] chain = shared_ptr[_Chain](sword.chain.createChain( total, name, len(name), seq, len(seq) ))
+        cdef bytes              seq
+        cdef shared_ptr[_Chain] chain
+        cdef uint32_t           total = self._chains.size()
+        cdef bytes              name  = str(total).encode()
+
+        seq = sequence.encode('ascii') if isinstance(sequence, str) else sequence
+        chain = shared_ptr[_Chain](sword.chain.createChain(total, name, len(name), seq, len(seq)))
 
         with self.lock.write:
             self._lengths.push_back(chain.get().length())
