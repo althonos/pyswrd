@@ -43,13 +43,19 @@ from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as 
 cimport pyopal.lib
 from pyopal.lib cimport digit_t
 
+import contextlib
 import operator
 import os
 import functools
 import threading
-import multiprocessing.pool
 from string import ascii_uppercase
 from pyopal import align
+
+try:
+    from multiprocessing.pool import ThreadPool
+except ImportError:
+    ThreadPool = None  # multiprocessing.pool may be missing on some environments
+
 
 # --- C++ constants and helpers -----------------------------------------------
 
@@ -103,6 +109,18 @@ cdef dict _SWORD_SCORE_MATRICES = {
 cdef pyopal.lib.Alphabet _SWORD_ALPHABET = pyopal.lib.Alphabet(
     ascii_uppercase
 )
+
+# --- Python helpers -----------------------------------------------------------
+
+@contextlib.contextmanager
+def nullcontext(enter_result):
+    """Return a context manager that returns its input and does nothing.
+
+    Adapted from `contextlib.nullcontext` for backwards compatibility
+    with Python 3.6.
+
+    """
+    yield enter_result
 
 # --- Parameters ---------------------------------------------------------------
 
@@ -322,30 +340,31 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
         raise NotImplementedError("Sequences.insert")
 
     cpdef Sequences mask(self, Mask bitmask):
-        cdef size_t    mask_size
         cdef bool      b
-        cdef Sequences sequences
         cdef size_t    i
-
-        if Mask is object:
-            mask_size = len(bitmask)
-        else:
-            mask_size = bitmask.size()
-
-        if mask_size != len(self):
-            raise IndexError(bitmask)
+        cdef Sequences sequences
+        cdef size_t    mask_size
 
         sequences = Sequences.__new__(Sequences)
         sequences.alphabet = self.alphabet
 
-        with nogil(Mask is not object):
-            i = 0
-            for b in bitmask:
-                if b:
-                    sequences._chains.push_back(self._chains[i])
-                    sequences._pointers.push_back(self._pointers[i])
-                    sequences._lengths.push_back(self._lengths[i])
-                i += 1
+        with self.lock.read:
+            if Mask is object:
+                mask_size = len(bitmask)
+            else:
+                mask_size = bitmask.size()
+
+            if mask_size != len(self):
+                raise IndexError(bitmask)
+
+            with nogil(Mask is not object):
+                i = 0
+                for b in bitmask:
+                    if b:
+                        sequences._chains.push_back(self._chains[i])
+                        sequences._pointers.push_back(self._pointers[i])
+                        sequences._lengths.push_back(self._lengths[i])
+                    i += 1
 
         return sequences
 
@@ -417,10 +436,11 @@ cdef class FilterResult:
     cdef readonly uint64_t database_length
     cdef readonly list     entries
     cdef readonly list     indices
+    cdef          _Indexes _indices
 
     def __init__(self, uint32_t database_size, uint64_t database_length, list entries, list indices):
         self.entries = entries
-        self.indices = indices
+        self._indices = self.indices = indices
         self.database_size = database_size
         self.database_length = database_length
 
@@ -462,8 +482,10 @@ cdef class HeuristicFilter:
         self.entries = _ChainEntrySet(len(self.queries))
         # parameters for multiprocessing
         self.threads = os.cpu_count() if threads == 0 else threads
-        if self.threads > 1:
-            self.pool = multiprocessing.pool.ThreadPool(self.threads)
+        if ThreadPool is None:
+            self.threads = 1
+        elif self.threads > 1:
+            self.pool = ThreadPool(self.threads)
         self.mutexes = vector[unique_ptr[mutex]]()
         for i in range(len(self.queries)):
             self.mutexes.push_back(unique_ptr[mutex](new mutex()))
@@ -849,12 +871,20 @@ def search(
 
     if threads == 0:
         threads = os.cpu_count() or 1
-    with multiprocessing.pool.ThreadPool(threads) as pool:
+    if ThreadPool is None:
+        threads = 1
+
+    if threads == 1:
+        pool_context = nullcontext(None)
+    else:
+        pool_context = ThreadPool(threads)
+
+    with pool_context as pool:
         for query_index, query in enumerate(query_db):
             # get length of query
             query_length = len(query)
             # extract candidates and align them in scoring mode only
-            target_indices = filter_result.indices[query_index]
+            target_indices = filter_result._indices[query_index]
             sub_db = target_db.extract(target_indices)
             score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
             # extract indices with E-value under threshold
@@ -864,6 +894,9 @@ def search(
                 target_evalue = evalue.calculate(score_result.score, query_length, target_length)
                 if target_evalue <= max_evalue:
                     target_evalues.emplace_back(target_index, target_evalue)
+            # skip second stage if no E-value passed the threshold
+            if target_evalues.empty():
+                continue
             # get only `max_alignments` alignments per query, smallest e-values first
             with nogil:
                 stable_sort_by_second(target_evalues)
