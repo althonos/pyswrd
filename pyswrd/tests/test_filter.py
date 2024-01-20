@@ -21,6 +21,29 @@ class _TestFilter:
             cls.sprot12071.append(record.seq)
 
 
+class TestHeuristicFilter(_TestFilter, unittest.TestCase):
+
+    maxDiff = None
+
+    def test_chunks(self):
+
+        f1 = HeuristicFilter(self.o74807, threads=1)
+        r1 = f1.score(self.sprot15).finish()
+
+        f2 = HeuristicFilter(self.o74807, threads=1)
+        f2.score(self.sprot15.extract(range(10)))
+        f2.score(self.sprot15.extract(range(10, len(self.sprot15))))
+        r2 = f2.finish()
+
+        self.assertEqual(len(r1.entries), len(r2.entries))
+        for e1, e2 in zip(r1.entries, r2.entries):
+            self.assertEqual(e1, e2)        
+
+
+
+
+
+
 class TestK3(_TestFilter, unittest.TestCase):
     def test_sprot15_sprot196(self):
         f = HeuristicFilter(self.sprot15)

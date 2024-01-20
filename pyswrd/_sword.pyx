@@ -428,6 +428,11 @@ cdef class FilterScore:
     def __repr__(self):
         return f"{type(self).__name__}({self.index!r}, {self.score!r})"
 
+    def __eq__(self, object other):
+        if not isinstance(other, FilterScore):
+            return NotImplemented
+        return self.index == other.index and self.score == other.score
+
 
 cdef class FilterResult:
     """The result of the heuristic filter.
@@ -605,6 +610,7 @@ cdef class HeuristicFilter:
         cdef uint32_t           id_
         cdef uint32_t           diagonal
         cdef uint32_t           max_diag_id
+        cdef uint32_t           database_id
         cdef bool               flag
         cdef unique_lock[mutex] lock
 
@@ -706,7 +712,8 @@ cdef class HeuristicFilter:
                         id_ = self.queries._chains[i + k].get().id()
                         flag = entries_part[id_].size() < self.max_candidates and entries_found[k] < self.max_candidates
                         if flag or max_score[k] >= min_entry_score[k]:
-                            entries_part[id_].emplace_back(_ChainEntry(database._chains[j].get().id(), max_score[k]))
+                            database_id = j + self.database_size
+                            entries_part[id_].emplace_back(_ChainEntry(database_id, max_score[k]))
                             if min_entry_score[k] > max_score[k]:
                                 min_entry_score[k] = max_score[k]
 
