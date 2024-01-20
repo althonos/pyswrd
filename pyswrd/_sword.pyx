@@ -80,7 +80,7 @@ cdef extern from * nogil:
 cdef extern from * nogil:
     """
     void stable_sort_by_length(std::vector<ChainEntry>& v) {
-        std::stable_sort(v.begin(), v.end(), [](const auto& a, const auto& b) {return a.data() > b.data(); });
+        std::stable_sort(v.begin(), v.end(), [](const auto& a, const auto& b) {return (a.data(), a.chain_idx()) > (b.data(), b.chain_idx()); });
     }
     """
     void stable_sort_by_length(vector[_ChainEntry] v)

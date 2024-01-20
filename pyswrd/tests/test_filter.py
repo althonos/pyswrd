@@ -26,7 +26,6 @@ class TestHeuristicFilter(_TestFilter, unittest.TestCase):
     maxDiff = None
 
     def test_chunks(self):
-
         f1 = HeuristicFilter(self.o74807, threads=1)
         r1 = f1.score(self.sprot15).finish()
 
@@ -39,7 +38,18 @@ class TestHeuristicFilter(_TestFilter, unittest.TestCase):
         for e1, e2 in zip(r1.entries, r2.entries):
             self.assertEqual(e1, e2)        
 
+    def test_chunks_threads(self):
+        f1 = HeuristicFilter(self.o74807, threads=4)
+        r1 = f1.score(self.sprot15).finish()
 
+        f2 = HeuristicFilter(self.o74807, threads=4)
+        f2.score(self.sprot15.extract(range(10)))
+        f2.score(self.sprot15.extract(range(10, len(self.sprot15))))
+        r2 = f2.finish()
+
+        self.assertEqual(len(r1.entries), len(r2.entries))
+        for e1, e2 in zip(r1.entries, r2.entries):
+            self.assertEqual(e1, e2)     
 
 
 
