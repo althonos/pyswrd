@@ -63,21 +63,12 @@ the original C++ implementation.
 
 PySWRD is available for all modern Python versions (3.6+).
 
-To install, you need the pre-release of PyOpal, which was refactored
-to make it easier to use with the SWORD data model, and then to 
-compile the package from source:
-
-```console
-$ pip install --pre pyopal
-$ pip install git+https://github.com/althonos/pyswrd
-```
-
-<!-- It can be installed directly from [PyPI](https://pypi.org/project/pyswrd/),
-which hosts some pre-built x86-64 and Aarch64 wheels for Linux, MacOS, and
-Windows, as well as the code required to compile from source with Cython:
+It can be installed directly from [PyPI](https://pypi.org/project/pyopal/),
+which hosts some pre-built x86-64 wheels for Linux, MacOS, and Windows, 
+as well as the code required to compile from source with Cython:
 ```console
 $ pip install pyswrd
-``` -->
+```
 
 <!-- Otherwise, PySWRD is also available as a [Bioconda](https://bioconda.github.io/)
 package:
@@ -86,7 +77,7 @@ $ conda install -c bioconda pyswrd
 ``` -->
 
 <!-- Check the [*install* page](https://pyswrd.readthedocs.io/en/stable/install.html)
-of the documentation for other ways to install PyOpal on your machine. -->
+of the documentation for other ways to install PySWRD on your machine. -->
 
 ## 💡 Example
 
@@ -137,9 +128,9 @@ for hit in pyswrd.search(queries, targets, threads=1):
     print(hit.query_index, hit.target_index, hit.score, hit.evalue)
 ```
 
-<!-- Note that the API of `pyswrd.HeuristicFilter`, used internally, allows 
-processing the target database in chunks, in the event the database 
-cannot fit into memory.  -->
+You can also use the `pyswrd.HeuristicFilter` class directly if you wish to 
+manage the data yourself, or if you want to use a different aligner.
+
 
 <!-- ## 🧶 Thread-safety -->
 

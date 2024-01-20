@@ -7,47 +7,47 @@ on:
 
 jobs:
 
-  wheel-linux-aarch64:
-    name: Build Linux wheels (Aarch64)
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        python-tag:
-        - cp36-manylinux_aarch64
-        - cp37-manylinux_aarch64
-        - cp38-manylinux_aarch64
-        - cp39-manylinux_aarch64
-        - cp310-manylinux_aarch64
-        - cp311-manylinux_aarch64
-        - cp312-manylinux_aarch64
-        - pp37-manylinux_aarch64
-        - pp38-manylinux_aarch64
-        - pp39-manylinux_aarch64
-        - pp310-manylinux_aarch64
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-    - name: Set up QEMU
-      id: qemu
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: all
-    - name: Build manylinux wheels
-      uses: pypa/cibuildwheel@v2.16.2
-      env:
-        CIBW_ARCHS: aarch64
-        CIBW_BUILD: ${{ matrix.python-tag }}
-        CIBW_BUILD_VERBOSITY: 2
-        CIBW_BEFORE_BUILD: pip install cython
-        CIBW_TEST_COMMAND: python -m unittest pyswrd.tests -vv
-        CIBW_TEST_REQUIRES: importlib-resources
-      with:
-        output-dir: dist
-    - uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist/*
+  # wheel-linux-aarch64:
+  #   name: Build Linux wheels (Aarch64)
+  #   runs-on: ubuntu-22.04
+  #   strategy:
+  #     matrix:
+  #       python-tag:
+  #       - cp36-manylinux_aarch64
+  #       - cp37-manylinux_aarch64
+  #       - cp38-manylinux_aarch64
+  #       - cp39-manylinux_aarch64
+  #       - cp310-manylinux_aarch64
+  #       - cp311-manylinux_aarch64
+  #       - cp312-manylinux_aarch64
+  #       - pp37-manylinux_aarch64
+  #       - pp38-manylinux_aarch64
+  #       - pp39-manylinux_aarch64
+  #       - pp310-manylinux_aarch64
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #     with:
+  #       submodules: true
+  #   - name: Set up QEMU
+  #     id: qemu
+  #     uses: docker/setup-qemu-action@v2
+  #     with:
+  #       platforms: all
+  #   - name: Build manylinux wheels
+  #     uses: pypa/cibuildwheel@v2.16.2
+  #     env:
+  #       CIBW_ARCHS: aarch64
+  #       CIBW_BUILD: ${{ matrix.python-tag }}
+  #       CIBW_BUILD_VERBOSITY: 2
+  #       CIBW_BEFORE_BUILD: pip install cython
+  #       CIBW_TEST_COMMAND: python -m unittest pyswrd.tests -vv
+  #       CIBW_TEST_REQUIRES: importlib-resources
+  #     with:
+  #       output-dir: dist
+  #   - uses: actions/upload-artifact@v3
+  #     with:
+  #       name: wheels
+  #       path: dist/*
 
   wheel-linux-x86_64:
     name: Build Linux wheels (x86-64)
@@ -132,41 +132,41 @@ jobs:
         name: wheels
         path: dist/*
 
-  wheel-macos-aarch64:
-    name: Build MacOS wheels (Aarch64)
-    runs-on: macOS-11
-    strategy:
-      matrix:
-        python-tag:
-        - cp38-macosx_arm64
-        - cp39-macosx_arm64
-        - cp310-macosx_arm64
-        - cp311-macosx_arm64
-        - cp312-macosx_arm64
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-    - uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        target: aarch64-apple-darwin
-    - name: Build manylinux wheels
-      uses: pypa/cibuildwheel@v2.16.2
-      env:
-        CIBW_ARCHS: arm64
-        CIBW_BUILD: ${{ matrix.python-tag }}
-        CIBW_BEFORE_BUILD: pip install cython
-        CIBW_BUILD_VERBOSITY: 2
-        CIBW_TEST_COMMAND: python -m unittest pyswrd.tests -vv
-        CIBW_TEST_REQUIRES: importlib-resources
-      with:
-        output-dir: dist
-    - uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist/*
+  # wheel-macos-aarch64:
+  #   name: Build MacOS wheels (Aarch64)
+  #   runs-on: macOS-11
+  #   strategy:
+  #     matrix:
+  #       python-tag:
+  #       - cp38-macosx_arm64
+  #       - cp39-macosx_arm64
+  #       - cp310-macosx_arm64
+  #       - cp311-macosx_arm64
+  #       - cp312-macosx_arm64
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #     with:
+  #       submodules: true
+  #   - uses: actions-rs/toolchain@v1
+  #     with:
+  #       toolchain: stable
+  #       override: true
+  #       target: aarch64-apple-darwin
+  #   - name: Build manylinux wheels
+  #     uses: pypa/cibuildwheel@v2.16.2
+  #     env:
+  #       CIBW_ARCHS: arm64
+  #       CIBW_BUILD: ${{ matrix.python-tag }}
+  #       CIBW_BEFORE_BUILD: pip install cython
+  #       CIBW_BUILD_VERBOSITY: 2
+  #       CIBW_TEST_COMMAND: python -m unittest pyswrd.tests -vv
+  #       CIBW_TEST_REQUIRES: importlib-resources
+  #     with:
+  #       output-dir: dist
+  #   - uses: actions/upload-artifact@v3
+  #     with:
+  #       name: wheels
+  #       path: dist/*
 
   wheel-win32-x86_64:
     name: Build Windows wheels (x86-64)
@@ -261,9 +261,9 @@ jobs:
     needs:
     - sdist
     - test-sdist
-    - wheel-linux-aarch64
+    # - wheel-linux-aarch64
     - wheel-linux-x86_64
-    - wheel-macos-aarch64
+    # - wheel-macos-aarch64
     - wheel-macos-x86_64
     - wheel-win32-x86_64
     steps:
@@ -288,40 +288,40 @@ jobs:
       with:
         github-token: '${{ secrets.GITHUB_TOKEN }}'
 
-  aur:
-    environment: Arch Linux User Repository
-    runs-on: ubuntu-latest
-    if: "!contains(github.ref, 'rc')"
-    name: Update AUR package
-    needs:
-    - sdist
-    - upload
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.11'
-    - name: Download built wheels
-      uses: actions/download-artifact@v2
-      with:
-          name: wheels
-          path: dist
-    - name: Extract package version
-      run: echo PKGVER=$(python setup.py --version) >> $GITHUB_ENV
-    - name: Compute SHA256 of source distribution
-      run: echo SHA256=$(sha256sum dist/pyswrd-${{ env.PKGVER }}.tar.gz | cut -f1 -d' ') >> $GITHUB_ENV
-    - name: Generate PKGBUILD
-      run: sed -e "s/%pkgver/${{ env.PKGVER }}/g" -e "s/%sha256sum/${{ env.SHA256 }}/g" pkg/aur/PKGBUILD.in > pkg/aur/PKGBUILD
-    - name: Update package
-      uses: KSXGitHub/github-actions-deploy-aur@v2.2.5
-      with:
-        pkgname: python-pyswrd
-        pkgbuild: pkg/aur/PKGBUILD
-        commit_username: ${{ secrets.AUR_USER }}
-        commit_email: ${{ secrets.AUR_EMAIL }}
-        ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-        commit_message: ${{ github.event.head_commit.message }}
-        ssh_keyscan_types: rsa,dsa,ecdsa,ed25519
+  # aur:
+  #   environment: Arch Linux User Repository
+  #   runs-on: ubuntu-latest
+  #   if: "!contains(github.ref, 'rc')"
+  #   name: Update AUR package
+  #   needs:
+  #   - sdist
+  #   - upload
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #     with:
+  #       submodules: true
+  #   - name: Set up Python 3.11
+  #     uses: actions/setup-python@v2
+  #     with:
+  #       python-version: '3.11'
+  #   - name: Download built wheels
+  #     uses: actions/download-artifact@v2
+  #     with:
+  #         name: wheels
+  #         path: dist
+  #   - name: Extract package version
+  #     run: echo PKGVER=$(python setup.py --version) >> $GITHUB_ENV
+  #   - name: Compute SHA256 of source distribution
+  #     run: echo SHA256=$(sha256sum dist/pyswrd-${{ env.PKGVER }}.tar.gz | cut -f1 -d' ') >> $GITHUB_ENV
+  #   - name: Generate PKGBUILD
+  #     run: sed -e "s/%pkgver/${{ env.PKGVER }}/g" -e "s/%sha256sum/${{ env.SHA256 }}/g" pkg/aur/PKGBUILD.in > pkg/aur/PKGBUILD
+  #   - name: Update package
+  #     uses: KSXGitHub/github-actions-deploy-aur@v2.2.5
+  #     with:
+  #       pkgname: python-pyswrd
+  #       pkgbuild: pkg/aur/PKGBUILD
+  #       commit_username: ${{ secrets.AUR_USER }}
+  #       commit_email: ${{ secrets.AUR_EMAIL }}
+  #       ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+  #       commit_message: ${{ github.event.head_commit.message }}
+  #       ssh_keyscan_types: rsa,dsa,ecdsa,ed25519
