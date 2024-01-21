@@ -901,7 +901,7 @@ def search(
                 # extract candidates and align them in scoring mode only
                 target_indices = filter_result._indices[query_index]
                 sub_db = target_db.extract(target_indices)
-                score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
+                score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
                 # extract indices with E-value under threshold
                 target_evalues.clear()
                 for score_result, target_index in zip(score_results, target_indices):
@@ -922,7 +922,7 @@ def search(
                         target_indices.push_back(target_pair.first)
                 # align selected sequences
                 sub_db = target_db.extract(target_indices)
-                ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool)
+                ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
                 # return hits for aligned sequences
                 for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
                     yield Hit(
