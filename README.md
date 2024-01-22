@@ -134,8 +134,32 @@ manage the data yourself, or if you want to use a different aligner.
 
 <!-- ## 🧶 Thread-safety -->
 
-<!-- ## ⏱️ Benchmarks -->
+## ⏱️ Benchmarks
 
+The table below shows the time for running `pyswrd.search` using 196 proteins 
+as queries (`uniprot_sprot196.fasta`) against a database of 12,701 proteins
+(`uniprot_sprot12071.fasta`) pre-loaded into memory:
+
+|                        | `threads=1` | `threads=2` | `threads=4` | `threads=8` | `threads=12` |
+|------------------------|-------------|-------------|-------------|-------------|--------------|
+| `max_candidates=10`    | 0.87s       | 0.83s       | 0.83s       | 0.80s       | 0.76s        |
+| `max_candidates=50`    | 0.98s       | 0.91s       | 0.98s       | 0.97s       | 1.04s        |
+| `max_candidates=100`   | 1.24s       | 1.33s       | 1.44s       | 1.63s       | 1.67s        |
+| `max_candidates=500`   | 1.86s       | 1.83s       | 1.95s       | 2.09s       | 2.15s        |
+| `max_candidates=1000`  | 2.87s       | 2.64s       | 2.83s       | 2.82s       | 2.90s        |
+| `max_candidates=5000`  | 9.33s       | 8.11s       | 7.59s       | 6.60s       | 6.06s        |
+| `max_candidates=15000` | 21.50s      | 15.85s      | 14.74s      | 11.83s      | 11.34s       |
+| `max_candidates=30000` | 23.44s      | 16.13s      | 14.61s      | 12.47s      | 11.08s       |
+| *no filter (Opal)*     | 31.38s      | 23.60s      | 19.57s      | 15.43s      | 14.60s       |
+
+The `max_candidates` parameter controls the strictness of the SWORD heuristic filter, and reduces 
+the total number of alignments made by Opal, at the cost of a lowered sensivity 
+(*see SWORD Supplementary Figs. S1 and S2.*). 
+
+*SWORD uses 15,000 candidates in **fast** mode and 30,000 candidates in **sensitive** mode by default. 
+This was benchmarked against the [NCBI NR](https://www.ncbi.nlm.nih.gov/refseq/about/nonredundantproteins/) 
+database, which contains more than 54M sequences; it is likely a smaller `max_candidates` value can 
+be selected for smaller databases and/or databases with less redundant sequences without loss of sensitivity.*
 
 ## 💭 Feedback
 
