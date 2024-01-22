@@ -475,6 +475,7 @@ cdef class HeuristicFilter:
 
     cdef readonly size_t                    threads
     cdef readonly object                    pool
+    cdef          bool                      pool_owned
     cdef          vector[unique_ptr[mutex]] mutexes
 
     def __init__(
@@ -486,6 +487,7 @@ cdef class HeuristicFilter:
         score_threshold = 13,
         Scorer scorer = Scorer(),
         size_t threads = 0,
+        object pool = None,
     ):
         # k-mer generation parameter
         self.queries = queries
@@ -497,10 +499,12 @@ cdef class HeuristicFilter:
         self.database_length = 0
         self.entries = _ChainEntrySet(len(self.queries))
         # parameters for multiprocessing
+        self.pool = pool
+        self.pool_owned = pool is None
         self.threads = os.cpu_count() if threads == 0 else threads
         if ThreadPool is None:
             self.threads = 1
-        elif self.threads > 1:
+        elif self.threads > 1 and self.pool is None:
             self.pool = ThreadPool(self.threads)
         self.mutexes = vector[unique_ptr[mutex]]()
         for i in range(len(self.queries)):
@@ -761,7 +765,7 @@ cdef class HeuristicFilter:
         return self
 
     cpdef FilterResult finish(self):
-        if self.pool is not None:
+        if self.pool_owned and self.pool is not None:
             self.pool.close()
         entries = [
             [FilterScore(entry.chain_idx(), entry.data()) for entry in entries]
@@ -837,9 +841,12 @@ def search(
             information.
         threads (`int`): The number of threads to use to run the
             pre-filter and alignments. If zero is given, uses the
-            number of CPUs reported by `os.cpu_count`. If one given,
-            use the main threads for aligning, otherwise spawns a
-            `multiprocessing.pool.ThreadPool`.
+            number of CPUs reported by `os.cpu_count`. 
+        pool (`~multiprocessing.pool.ThreadPool`): A running pool 
+            instance to use for parallelization. Useful for reusing 
+            the same pool across several calls of `~pyswrd.search`. 
+            If `None` given, spawns a new pool based on the ``threads``
+            argument.
 
     Yields:
         `~pyswrd.Hit`: Hit objects for each hit passing the threshold
@@ -888,46 +895,50 @@ def search(
     scorer  = Scorer(name=scorer_name, gap_open=gap_open, gap_extend=gap_extend)
     score_matrix = scorer.score_matrix
 
-    with query_db.lock.read, target_db.lock.read:
+    if threads == 1:
+        pool_context = nullcontext(None)
+    else:
+        pool_context = ThreadPool(threads)
+
+    with query_db.lock.read, target_db.lock.read, pool_context as pool:
         # run the filter on the DB
-        hfilter = HeuristicFilter(query_db, kmer_length=kmer_length, max_candidates=max_candidates, score_threshold=score_threshold, scorer=scorer, threads=threads)
+        hfilter = HeuristicFilter(query_db, kmer_length=kmer_length, max_candidates=max_candidates, score_threshold=score_threshold, scorer=scorer, threads=threads, pool=pool)
         filter_result = hfilter.score(target_db).finish()
         evalue = EValue(filter_result.database_length, scorer)
         # align the DB
-        with (nullcontext(None) if threads == 1 else ThreadPool(threads)) as pool:
-            for query_index, query in enumerate(query_db):
-                # get length of query
-                query_length = len(query)
-                # extract candidates and align them in scoring mode only
-                target_indices = filter_result._indices[query_index]
-                sub_db = target_db.extract(target_indices)
-                score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
-                # extract indices with E-value under threshold
-                target_evalues.clear()
-                for score_result, target_index in zip(score_results, target_indices):
-                    target_length = target_db._lengths[target_index]
-                    target_evalue = evalue.calculate(score_result.score, query_length, target_length)
-                    if target_evalue <= max_evalue:
-                        target_evalues.emplace_back(target_index, target_evalue)
-                # skip second stage if no E-value passed the threshold
-                if target_evalues.empty():
-                    continue
-                # get only `max_alignments` alignments per query, smallest e-values first
-                with nogil:
-                    stable_sort_by_second(target_evalues)
-                    if target_evalues.size() > max_alignments:
-                        target_evalues.resize(max_alignments)
-                    target_indices.clear()
-                    for target_pair in target_evalues:
-                        target_indices.push_back(target_pair.first)
-                # align selected sequences
-                sub_db = target_db.extract(target_indices)
-                ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
-                # return hits for aligned sequences
-                for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
-                    yield Hit(
-                        query_index=query_index,
-                        target_index=target_index,
-                        evalue=target_evalue,
-                        result=target_result
-                    )
+        for query_index, query in enumerate(query_db):
+            # get length of query
+            query_length = len(query)
+            # extract candidates and align them in scoring mode only
+            target_indices = filter_result._indices[query_index]
+            sub_db = target_db.extract(target_indices)
+            score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
+            # extract indices with E-value under threshold
+            target_evalues.clear()
+            for score_result, target_index in zip(score_results, target_indices):
+                target_length = target_db._lengths[target_index]
+                target_evalue = evalue.calculate(score_result.score, query_length, target_length)
+                if target_evalue <= max_evalue:
+                    target_evalues.emplace_back(target_index, target_evalue)
+            # skip second stage if no E-value passed the threshold
+            if target_evalues.empty():
+                continue
+            # get only `max_alignments` alignments per query, smallest e-values first
+            with nogil:
+                stable_sort_by_second(target_evalues)
+                if target_evalues.size() > max_alignments:
+                    target_evalues.resize(max_alignments)
+                target_indices.clear()
+                for target_pair in target_evalues:
+                    target_indices.push_back(target_pair.first)
+            # align selected sequences
+            sub_db = target_db.extract(target_indices)
+            ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
+            # return hits for aligned sequences
+            for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
+                yield Hit(
+                    query_index=query_index,
+                    target_index=target_index,
+                    evalue=target_evalue,
+                    result=target_result
+                )
