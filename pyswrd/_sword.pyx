@@ -922,7 +922,7 @@ def search(
         max_evalue (`float`): The E-value threshold above which to
             discard sequences before alignment.
         algorithm (`str`): The algorithm to use to perform pairwise
-            alignment. See `pyopal.Database.search` for more
+            alignment. See `pyopal.Aligner.align` for more
             information.
         threads (`int`): The number of threads to use to run the
             pre-filter and alignments. If zero is given, uses the
