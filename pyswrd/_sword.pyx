@@ -232,10 +232,33 @@ cdef class EValue:
     cdef          shared_ptr[_EValue] _evalue
 
     def __init__(self, uint64_t database_size, Scorer scorer):
+        """Create a new E-value calculator.
+
+        Arguments:
+            database_size (`int`): The total length of the database,
+                i.e. the cumulated length of all sequences lengths
+                in the database.
+            scorer (`~pyswrd.Scorer`): The scorer to use for computing
+                the alignment scores.
+
+        """
         self.scorer = scorer
         self._evalue = shared_ptr[_EValue](sword.evalue.createEValue(database_size, scorer._sm))
 
     cpdef double calculate(self, int32_t score, uint32_t query_length, uint32_t target_length):
+        """Calculate the E-value for a single alignment.
+
+        Arguments:
+            score (`float`): The score of the alignment.
+            query_length (`int`): The length of the query sequence in
+                the alignment.
+            target_length (`int`): The length of the target sequence
+                in the alignment.
+
+        Returns:
+            `float`: The E-value for the alignment.
+
+        """
         return self._evalue.get().calculate(score, query_length, target_length)
 
 # --- Sequence Storage ---------------------------------------------------------
@@ -500,6 +523,30 @@ cdef class HeuristicFilter:
         size_t threads = 0,
         object pool = None,
     ):
+        """Create a new heuristic filter.
+
+        Arguments:
+            queries (`~pyswrd.Sequences`): The queries sequences for which
+                to filter the target database.
+
+        Keyword Arguments:
+            kmer_length (`int`): The length of the k-mers to generate
+                in the heuristic filter.
+            max_candidates (`int`): The maximum number of candidate 
+                target sequences to keep per query sequence.
+            score_threshold (`int`): The minimum score for generated 
+                k-mers.
+            scorer (`~pyswrd.Scorer`): The scorer to use for scoring
+                alignments.
+            threads (`int`): The number of threads to use for scoring 
+                k-mers in parallel. Set to one to disable multi-threading.
+                Set to zero to use the number of CPUs reported by 
+                `os.cpu_count`.
+            pool (`multiprocessing.pool.ThreadPool`): A running 
+                ``ThreadPool`` instance to use for scoring database 
+                chunks in parallel. If `None` given, create a new one.
+
+        """
         # k-mer generation parameter
         self.queries = queries
         self.score_threshold = score_threshold
@@ -764,6 +811,18 @@ cdef class HeuristicFilter:
                 i += group_length
 
     cpdef HeuristicFilter score(self, Sequences database):
+        """Score a chunk of the database.
+
+        This method updates the internal counter of databases sequences.
+        The target indices correspond to the order the filter has seen
+        the sequences. Passing the same sequence twice will cause the 
+        heuristic filter to treat them as two independent sequences.
+
+        Arguments:
+            database (`~pyswrd.Sequences`): The sequences of 
+                the database chunk.
+
+        """
         if self.threads > 1:
             splits = list(self._preprocess_database(database))
             score = functools.partial(self._score_chunk, database)
@@ -776,6 +835,8 @@ cdef class HeuristicFilter:
         return self
 
     cpdef FilterResult finish(self):
+        """Finish scoring the database.
+        """
         if self.pool_owned and self.pool is not None:
             self.pool.close()
         entries = [
@@ -790,6 +851,17 @@ cdef class HeuristicFilter:
 # --- Database Search ---------------------------------------------------------
 
 cdef class Hit:
+    """A single hit of a database search.
+
+    Attributes:
+        query_index (`int`): The index of the query in the query sequences.
+        target_index (`int`): The index of the target in the target
+            sequences.
+        evalue (`float`): The E-value of the hit.
+        result (`~pyopal.FullResult`): The PyOpal result corresponding
+            to the alignment between the query and target sequences.
+
+    """
     cdef readonly uint32_t              query_index
     cdef readonly uint32_t              target_index
     cdef readonly double                evalue
@@ -807,6 +879,8 @@ cdef class Hit:
 
     @property
     def score(self):
+        """`float`: The bitscore of the alignment.
+        """
         return self.result.score
 
 def search(
@@ -852,10 +926,10 @@ def search(
             information.
         threads (`int`): The number of threads to use to run the
             pre-filter and alignments. If zero is given, uses the
-            number of CPUs reported by `os.cpu_count`. 
-        pool (`~multiprocessing.pool.ThreadPool`): A running pool 
-            instance to use for parallelization. Useful for reusing 
-            the same pool across several calls of `~pyswrd.search`. 
+            number of CPUs reported by `os.cpu_count`.
+        pool (`~multiprocessing.pool.ThreadPool`): A running pool
+            instance to use for parallelization. Useful for reusing
+            the same pool across several calls of `~pyswrd.search`.
             If `None` given, spawns a new pool based on the ``threads``
             argument.
 
