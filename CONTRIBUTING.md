@@ -7,10 +7,17 @@ feedback.
 ## Setting up a local repository
 
 Make sure you clone the repository in recursive mode, so you also get the
-wrapped code of Opal which is exposed as a ``git`` submodule:
+wrapped code of SWORD which is exposed as a ``git`` submodule:
 
 ```console
 $ git clone --recursive https://github.com/althonos/pyswrd
+```
+
+You will need to have `Cython` and `PyOpal` installed to be able to 
+compile the `pyswrd` extension:
+
+```console
+$ pip install --user pyswrd pyopal
 ```
 
 ## Running tests
