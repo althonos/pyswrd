@@ -1,5 +1,5 @@
 # distutils: language = c++
-# cython: language_level=3, linetrace=True, binding=True
+# cython: language_level=3, linetrace=True, binding=True, embedsignature=False
 """Bindings to SWORD, a heuristic method for sequence database search.
 
 References:
@@ -131,6 +131,17 @@ cdef class KmerGenerator:
     cdef readonly Scorer             scorer
 
     def __init__(self, Scorer scorer, size_t kmer_length = 3, size_t score_threshold = 13):
+        """Create a new k-mer generator.
+
+        Arguments:
+            scorer (`~pyswrd.Scorer`): A scorer to use to compute the k-mer
+                scores.
+            kmer_length (`int`): The length of the k-mers to generate.
+            score_threshold (`int`): The minimum score threshold for a k-mer
+                to be marked a hit. Set to zero to only consider k-mers that
+                are exact matches.
+
+        """
         self.scorer = scorer
         if kmer_length < 3 or kmer_length > 5:
             raise ValueError(f"kmer_length must be 3, 4 or 5, got: {kmer_length!r}")
