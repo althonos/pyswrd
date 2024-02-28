@@ -296,11 +296,11 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
     cdef size_t get_size(self) noexcept:
         return self._chains.size()
 
-    cdef const digit_t** get_sequences(self) except NULL:
+    cdef const digit_t** get_sequences(self) except? NULL:
         cdef digit_t** sequences = self._pointers.data()
         return <const digit_t**> sequences
 
-    cdef const int* get_lengths(self) except NULL:
+    cdef const int* get_lengths(self) except? NULL:
         return self._lengths.data()
 
     # --- Sequence interface ---------------------------------------------------
