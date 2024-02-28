@@ -151,6 +151,7 @@ as queries (`uniprot_sprot196.fasta`) against a database of 12,701 proteins
 | `max_candidates=15000` | 21.50s      | 15.85s      | 14.74s      | 11.83s      | 11.34s       |
 | `max_candidates=30000` | 23.44s      | 16.13s      | 14.61s      | 12.47s      | 11.08s       |
 | *no filter (Opal)*     | 31.38s      | 23.60s      | 19.57s      | 15.43s      | 14.60s       |
+| *BLAST+ (`blastp`)*    | 7.46s       | 4.97s       | 4.01s       | 3.63s       | 3.66s        |
 
 The `max_candidates` parameter controls the strictness of the SWORD heuristic filter, and reduces 
 the total number of alignments made by Opal, at the cost of a lowered sensivity 
