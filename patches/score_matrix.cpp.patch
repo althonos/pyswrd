@@ -1,0 +1,11 @@
+@@ -288,10 +288,6 @@
+     }
+ }
+ 
+-int ScoreMatrix::score(uint32_t row, uint32_t column) const {
+-    return matrix_[row * num_columns_ + column];
+-}
+-
+ std::string ScoreMatrix::scorerName() const {
+   switch (type_) {
+     case ScoreMatrixType::kBlosum45:

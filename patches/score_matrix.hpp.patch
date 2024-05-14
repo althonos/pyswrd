@@ -1,0 +1,13 @@
+@@ -54,7 +54,11 @@
+ 
+     std::string scorerName() const;
+ 
+-    int score(uint32_t row, uint32_t column) const;
++    // int score(uint32_t row, uint32_t column) const;
++
++    int score(uint32_t row, uint32_t column) const {
++        return matrix_[row * num_columns_ + column];
++    }
+ 
+     friend std::unique_ptr<ScoreMatrix> createScoreMatrix(ScoreMatrixType type,
+         int32_t gap_open, int32_t gap_extend);
