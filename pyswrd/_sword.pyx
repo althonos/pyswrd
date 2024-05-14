@@ -42,6 +42,7 @@ from sword.score_matrix cimport ScoreMatrix as _ScoreMatrix, ScoreMatrixType as 
 
 cimport pyopal.lib
 from pyopal.lib cimport digit_t
+from scoring_matrices cimport ScoringMatrix
 
 import contextlib
 import operator
@@ -153,7 +154,7 @@ cdef class Scorer:
     """A class storing the scoring matrix and gap parameters for alignments.
     """
     cdef          shared_ptr[_ScoreMatrix] _sm
-    cdef readonly pyopal.lib.ScoreMatrix   score_matrix
+    cdef readonly ScoringMatrix            scoring_matrix
 
     def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
         cdef _ScoreMatrixType ty
@@ -170,8 +171,9 @@ cdef class Scorer:
         )
 
         cdef int* scores = self._sm.get().data()
-        self.score_matrix = pyopal.lib.ScoreMatrix(
-            alphabet=_SWORD_ALPHABET,
+        self.scoring_matrix = ScoringMatrix(
+            alphabet=_SWORD_ALPHABET.letters,
+            name=name,
             matrix = [
                 [
                     scores[i*sword.score_matrix.num_columns_ + j]
@@ -955,7 +957,7 @@ def search(
     cdef Sequences                      query_db
     cdef Sequences                      target_db
     cdef Scorer                         scorer
-    cdef pyopal.lib.ScoreMatrix         score_matrix
+    cdef ScoringMatrix                  scoring_matrix
     cdef HeuristicFilter                hfilter
     cdef EValue                         evalue
     cdef double                         target_evalue
@@ -978,7 +980,7 @@ def search(
     target_db = targets if isinstance(targets, Sequences) else Sequences(targets)
 
     scorer  = Scorer(name=scorer_name, gap_open=gap_open, gap_extend=gap_extend)
-    score_matrix = scorer.score_matrix
+    scoring_matrix = scorer.scoring_matrix
 
     if threads == 1:
         pool_context = nullcontext(None)
@@ -997,7 +999,7 @@ def search(
             # extract candidates and align them in scoring mode only
             target_indices = filter_result._indices[query_index]
             sub_db = target_db.extract(target_indices)
-            score_results = align(query, sub_db, algorithm=algorithm, mode="score", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
+            score_results = align(query, sub_db, algorithm=algorithm, mode="score", scoring_matrix=scoring_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
             # extract indices with E-value under threshold
             target_evalues.clear()
             for score_result, target_index in zip(score_results, target_indices):
@@ -1018,7 +1020,7 @@ def search(
                     target_indices.push_back(target_pair.first)
             # align selected sequences
             sub_db = target_db.extract(target_indices)
-            ali_results = align(query, sub_db, algorithm=algorithm, mode="full", score_matrix=score_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
+            ali_results = align(query, sub_db, algorithm=algorithm, mode="full", scoring_matrix=scoring_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
             # return hits for aligned sequences
             for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
                 yield Hit(
