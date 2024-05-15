@@ -7,3 +7,15 @@
  
  class Hit {
  public:
+@@ -46,7 +46,10 @@
+     ~Hash() {};
+ 
+     using Iterator = std::vector<Hit>::iterator;
+-    void hits(Iterator& start, Iterator& end, uint32_t key);
++    void hits(Iterator& start, Iterator& end, uint32_t key) {
++        start = hits_.begin() + starts_[key];
++        end = hits_.begin() + starts_[key+1];
++    }
+ 
+     friend std::unique_ptr<Hash> createHash(const ChainSet& chains,
+         uint32_t start, uint32_t length, std::shared_ptr<Kmers> kmers);

@@ -1,0 +1,8 @@
+@@ -66,7 +66,3 @@
+     }
+ }
+ 
+-void Hash::hits(Iterator& start, Iterator& end, uint32_t key) {
+-    start = hits_.begin() + starts_[key];
+-    end = hits_.begin() + starts_[key+1];
+-}
