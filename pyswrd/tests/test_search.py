@@ -16,12 +16,6 @@ class TestSearch(unittest.TestCase):
         for record in data.load_records("uniprot_sprot15.fasta"):
             cls.sprot15.append(record.seq)
             cls.names.append(record.id)
-        cls.sprot196 = Sequences()
-        for record in data.load_records("uniprot_sprot196.fasta"):
-            cls.sprot196.append(record.seq)
-        cls.sprot12071 = Sequences()
-        for record in data.load_records("uniprot_sprot12071.fasta"):
-            cls.sprot12071.append(record.seq)
 
     def test_search(self):
         # Results from SWORD:
@@ -76,28 +70,3 @@ class TestSearch(unittest.TestCase):
 
         #     # print(hit.target_index, hit.evalue, hit.score, sep="\t")
         #     print(hit.target_index, hit.score, sep="\t")
-
-
-
-    # def test_search(self):
-    #     hits = list(search(self.o74807, self.sprot15, gap_open=10, gap_extend=1, scorer_name="BLOSUM50", algorithm="sw"))
-    #     self.assertEqual(len(hits), 10)
-        
-    #     hits.sort(key=lambda h: h.evalue)
-
-    #     self.assertAlmostEqual(hits[0].evalue, 1.70e-5)
-    #     self.assertAlmostEqual(hits[1].evalue, 1.87e-5)
-    #     self.assertAlmostEqual(hits[2].evalue, 2.34e-5)
-
-    #     for hit in hits:
-
-    #         # query = self.o74807[0]
-    #         # target = self.sprot15[hit.target_index]
-    #         # print(self.names[hit.target_index])
-
-    #         # print(query)
-    #         # print(target)
-
-    #         # print(hit.result.query_start, hit.result.query_end, hit.result.target_start, hit.result.target_end, hit.evalue, hit.score, sep="\t")
-
-

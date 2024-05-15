@@ -13,6 +13,10 @@ except ImportError:
 from ..fasta import parse, zopen
 
 
+def exists(name):
+    return files(__name__).joinpath(name).exists()
+
+
 @contextlib.contextmanager
 def load(name, mode="rb"):
     with zopen(files(__name__).joinpath(name), mode=mode) as src:

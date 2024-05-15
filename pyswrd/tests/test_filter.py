@@ -8,23 +8,29 @@ class _TestFilter:
     @classmethod
     def setUpClass(cls):
         cls.o74807 = Sequences()
-        for record in data.load_records("O74807.fasta"):
-            cls.o74807.append(record.seq)
+        if data.exists("O74807.fasta"):
+            for record in data.load_records("O74807.fasta"):
+                cls.o74807.append(record.seq)
         cls.sprot15 = Sequences()
-        for record in data.load_records("uniprot_sprot15.fasta"):
-            cls.sprot15.append(record.seq)
+        if data.exists("uniprot_sprot15.fasta"):
+            for record in data.load_records("uniprot_sprot15.fasta"):
+                cls.sprot15.append(record.seq)
         cls.sprot196 = Sequences()
-        for record in data.load_records("uniprot_sprot196.fasta"):
-            cls.sprot196.append(record.seq)
+        if data.exists("uniprot_sprot196.fasta"):
+            for record in data.load_records("uniprot_sprot196.fasta"):
+                cls.sprot196.append(record.seq)
         cls.sprot12071 = Sequences()
-        for record in data.load_records("uniprot_sprot12071.fasta"):
-            cls.sprot12071.append(record.seq)
+        if data.exists("uniprot_sprot12071.fasta"):
+            for record in data.load_records("uniprot_sprot12071.fasta"):
+                cls.sprot12071.append(record.seq)
 
 
 class TestHeuristicFilter(_TestFilter, unittest.TestCase):
 
     maxDiff = None
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
     def test_chunks(self):
         f1 = HeuristicFilter(self.o74807, threads=1)
         r1 = f1.score(self.sprot15).finish()
@@ -38,6 +44,8 @@ class TestHeuristicFilter(_TestFilter, unittest.TestCase):
         for e1, e2 in zip(r1.entries, r2.entries):
             self.assertEqual(e1, e2)        
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
     def test_chunks_threads(self):
         f1 = HeuristicFilter(self.o74807, threads=4)
         r1 = f1.score(self.sprot15).finish()
@@ -55,6 +63,9 @@ class TestHeuristicFilter(_TestFilter, unittest.TestCase):
 
 
 class TestK3(_TestFilter, unittest.TestCase):
+
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot196.fasta"), "missing data file")
     def test_sprot15_sprot196(self):
         f = HeuristicFilter(self.sprot15)
         f.score(self.sprot196)
@@ -75,6 +86,8 @@ class TestK3(_TestFilter, unittest.TestCase):
         self.assertEqual(len(result.indices[13]), 195)
         self.assertEqual(len(result.indices[14]), 164)
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
     def test_o74807_sprot15(self):
         f = HeuristicFilter(self.o74807)
         f.score(self.sprot15)
@@ -84,6 +97,8 @@ class TestK3(_TestFilter, unittest.TestCase):
             [0, 1, 2, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14]
         )
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot196.fasta"), "missing data file")
     def test_o74807_sprot196(self):
         f = HeuristicFilter(self.o74807)
         f.score(self.sprot196)
@@ -98,6 +113,8 @@ class TestK3(_TestFilter, unittest.TestCase):
             [181, 187, 188, 189, 190, 191, 192, 193, 194, 195]
         )
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot12071.fasta"), "missing data file")
     def test_o74807_sprot12071(self):
         f = HeuristicFilter(self.o74807)
         f.score(self.sprot12071)
@@ -114,6 +131,9 @@ class TestK3(_TestFilter, unittest.TestCase):
 
 
 class TestK4(_TestFilter, unittest.TestCase):
+
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot196.fasta"), "missing data file")
     def test_sprot15_sprot196(self):
         f = HeuristicFilter(self.sprot15, kmer_length=4)
         f.score(self.sprot196)
@@ -134,6 +154,8 @@ class TestK4(_TestFilter, unittest.TestCase):
         self.assertEqual(len(result.indices[13]), 196)
         self.assertEqual(len(result.indices[14]), 176)
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
     def test_o74807_sprot15(self):
         f = HeuristicFilter(self.o74807, kmer_length=4)
         f.score(self.sprot15)
@@ -143,12 +165,16 @@ class TestK4(_TestFilter, unittest.TestCase):
             [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         )
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot196.fasta"), "missing data file")
     def test_o74807_sprot196(self):
         f = HeuristicFilter(self.o74807, kmer_length=4)
         f.score(self.sprot196)
         result = f.finish()
         self.assertEqual(set(range(196)) - set(result.indices[0]), {193, 110, 159})
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot12071.fasta"), "missing data file")
     def test_o74807_sprot12071(self):
         f = HeuristicFilter(self.o74807, kmer_length=4)
         f.score(self.sprot12071)
@@ -165,6 +191,8 @@ class TestK4(_TestFilter, unittest.TestCase):
 
 
 class TestT50(_TestFilter, unittest.TestCase):
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot196.fasta"), "missing data file")
     def test_sprot15_sprot196(self):
         f = HeuristicFilter(self.sprot15, score_threshold=50)
         f.score(self.sprot196)
@@ -185,12 +213,16 @@ class TestT50(_TestFilter, unittest.TestCase):
         self.assertEqual(len(result.indices[13]), 161)
         self.assertEqual(len(result.indices[14]), 24)
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
     def test_o74807_sprot15(self):
         f = HeuristicFilter(self.o74807, score_threshold=50)
         f.score(self.sprot15)
         result = f.finish()
         self.assertEqual(result.indices[0], [2, 8, 10, 12, 14])
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot196.fasta"), "missing data file")
     def test_o74807_sprot196(self):
         f = HeuristicFilter(self.o74807, score_threshold=50)
         f.score(self.sprot196)
@@ -205,6 +237,8 @@ class TestT50(_TestFilter, unittest.TestCase):
             [156, 157, 158, 161, 164, 173, 174, 176, 180, 181]
         )
 
+    @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
+    @unittest.skipUnless(data.exists("uniprot_sprot12071.fasta"), "missing data file")
     def test_o74807_sprot12071(self):
         f = HeuristicFilter(self.o74807, score_threshold=50)
         f.score(self.sprot12071)
