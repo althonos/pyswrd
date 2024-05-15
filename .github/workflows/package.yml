@@ -27,7 +27,7 @@ jobs:
   #   steps:
   #   - uses: actions/checkout@v3
   #     with:
-  #       submodules: true
+  #       submodules: recursive
   #   - name: Set up QEMU
   #     id: qemu
   #     uses: docker/setup-qemu-action@v2
@@ -69,7 +69,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - name: Build manylinux wheels
       uses: pypa/cibuildwheel@v2.16.5
       env:
@@ -106,7 +106,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - name: Build manylinux wheels
       uses: pypa/cibuildwheel@v2.16.5
       env:
@@ -138,7 +138,7 @@ jobs:
   #   steps:
   #   - uses: actions/checkout@v3
   #     with:
-  #       submodules: true
+  #       submodules: recursive
   #   - name: Build manylinux wheels
   #     uses: pypa/cibuildwheel@v2.16.5
   #     env:
@@ -175,7 +175,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - name: Build manylinux wheels
       uses: pypa/cibuildwheel@v2.16.5
       env:
@@ -198,7 +198,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - name: Set up Python 3.11
       uses: actions/setup-python@v2
       with:
@@ -266,7 +266,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - uses: rasmus-saks/release-a-changelog-action@v1.0.1
       with:
         github-token: '${{ secrets.GITHUB_TOKEN }}'
@@ -282,7 +282,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: true
+        submodules: recursive
     - name: Set up Python 3.11
       uses: actions/setup-python@v2
       with:
