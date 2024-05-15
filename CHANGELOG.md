@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 
 ## [Unreleased]
-[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.2.0...HEAD
+
+
+## [v0.2.0] - 2024-05-15
+[v0.2.0]: https://github.com/althonos/pyswrd/compare/v0.1.1...v0.2.0
+
+### Changed
+- Update `pyopal` dependency to `v0.6.0`.
+- Use `scoring-matrices` package to expose the scoring matrix of `pyswrd.Scorer` objects.
+- Inline some SWORD functions to improve performance in some critical sections.
 
 
 ## [v0.1.1] - 2024-02-28
