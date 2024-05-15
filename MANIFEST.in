@@ -6,7 +6,8 @@ include README.md
 recursive-include include           *.pxd
 recursive-include patches           *.patch
 recursive-include pyswrd            *.py *.pyi *.pxi *.pyx *.pxd *.h py.typed
-recursive-include pyswrd/tests/data *
+recursive-include pyswrd/tests/data *.fasta
+exclude                             pyswrd/tests/data/uniprot_sprot12071.fasta
 
 recursive-include vendor/sword      README.md LICENSE AUTHORS CHANGELOG CMakeLists.txt
 recursive-include vendor/sword      *.cpp *.h *.hpp
