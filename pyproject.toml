@@ -81,6 +81,7 @@ test-requires = ["importlib-resources"]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
+archs = ["x86_64", "arm64"]
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
