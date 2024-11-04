@@ -1,9 +1,7 @@
-coverage ~=6.0
+coverage ~=7.0
 cython ~=3.0
-pyopal ~=0.6.0
-scoring-matrices ~=0.2.0
-wheel
-auditwheel
-setuptools >=46.4.0
+pyopal ~=0.7.0
+scoring-matrices ~=0.3.0
+scikit-build-core
+build
 importlib-resources ; python_version < '3.9'
-biopython           ; implementation_name == 'cpython'

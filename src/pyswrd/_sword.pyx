@@ -111,6 +111,8 @@ cdef pyopal.lib.Alphabet _SWORD_ALPHABET = pyopal.lib.Alphabet(
     ascii_uppercase
 )
 
+__version__ = PROJECT_VERSION
+
 # --- Python helpers -----------------------------------------------------------
 
 @contextlib.contextmanager
@@ -732,7 +734,7 @@ cdef class HeuristicFilter:
                     libcpp.algorithm.max_element(
                         database._chains.begin() + database_start,
                         database._chains.begin() + database_end,
-                        chainLengthKey
+                        &chainLengthKey
                     )
                 )
                 .get()
