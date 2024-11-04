@@ -734,7 +734,7 @@ cdef class HeuristicFilter:
                     libcpp.algorithm.max_element(
                         database._chains.begin() + database_start,
                         database._chains.begin() + database_end,
-                        chainLengthKey
+                        &chainLengthKey
                     )
                 )
                 .get()
