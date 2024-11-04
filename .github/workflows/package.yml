@@ -9,11 +9,11 @@ jobs:
 
   wheel-linux-aarch64:
     name: Build Linux wheels (Aarch64)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Set up QEMU
       id: qemu
       uses: docker/setup-qemu-action@v3
@@ -38,7 +38,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Build manylinux wheels
       uses: pypa/cibuildwheel@v2.21.3
       env:
@@ -54,11 +54,11 @@ jobs:
 
   wheel-macos-x86_64:
     name: Build MacOS wheels (x86-64)
-    runs-on: macOS-12
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Build manylinux wheels
       uses: pypa/cibuildwheel@v2.21.3
       env:
@@ -74,11 +74,11 @@ jobs:
 
   wheel-macos-aarch64:
     name: Build MacOS wheels (Aarch64)
-    runs-on: macOS-12
+    runs-on: macOS-latest
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Build manylinux wheels
       uses: pypa/cibuildwheel@v2.21.3
       env:
@@ -99,7 +99,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Configure build for amd64
       uses: ilammy/msvc-dev-cmd@v1
       with:
@@ -124,7 +124,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:

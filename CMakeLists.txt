@@ -16,11 +16,15 @@ include(CheckCXXCompilerFlag)
 
 check_cxx_compiler_flag(-funroll-loops HAVE_UNROLL_LOOPS)
 check_cxx_compiler_flag(-faligned-new HAVE_ALIGNED_NEW)
+check_cxx_compiler_flag(-Wno-narrowing HAVE_NARROWING)
 if(HAVE_UNROLL_LOOPS)
     add_compile_options(-funroll-loops)
 endif()
 if(HAVE_ALIGNED_NEW)
     add_compile_options(-faligned-new)
+endif()
+if(HAVE_NARROWING)
+    add_compile_options(-Wno-narrowing)
 endif()
 
 
