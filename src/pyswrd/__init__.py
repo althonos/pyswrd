@@ -1,6 +1,6 @@
 # noqa: D104
 __author__ = "Martin Larralde <martin.larralde@embl.de>"
-__license__ = "MIT"
+__license__ = "GPLv3"
 __all__ = [
     "HeuristicFilter",
     "KmerGenerator",
