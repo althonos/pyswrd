@@ -47,4 +47,4 @@ endforeach()
 
 add_library(sword STATIC ${SWORD_PATCHED_SOURCES})
 target_include_directories(sword PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(sword PUBLIC ${PYOPAL_PATH}/pyopal)
+target_include_directories(sword PUBLIC ${PROJECT_SOURCE_DIR}/vendor/sword/vendor/opal/src)
