@@ -4,9 +4,6 @@ PySWRD |Stars|
 .. |Stars| image:: https://img.shields.io/github/stars/althonos/pyswrd.svg?style=social&maxAge=3600&label=Star
    :target: https://github.com/althonos/pyswrd/stargazers
 
-`Cython <https://cython.org/>`_ *bindings and Python interface to* `Opal <https://github.com/Martinsos/opal>`_,
-*a SIMD-accelerated pairwise aligner.*
-
 `Cython <https://cython.org/>`_ *bindings and Python interface to* `SWORD <https://github.com/rvaser/sword>`_ *(Smith Waterman On Reduced Database), a method for fast database search.*
 
 |Actions| |Coverage| |PyPI| |Bioconda| |AUR| |Wheel| |Versions| |Implementations| |License| |Source| |Mirror| |Issues| |Docs| |Changelog| |Downloads|
@@ -42,7 +39,7 @@ PySWRD |Stars|
    :target: https://github.com/althonos/pyswrd/
 
 .. |Mirror| image:: https://img.shields.io/badge/mirror-EMBL-009f4d?style=flat-square&maxAge=2678400
-   :target: https://git.embl.de/larralde/pytrimapyswrdl/
+   :target: https://git.embl.de/larralde/pyswrd/
 
 .. |Issues| image:: https://img.shields.io/github/issues/althonos/pyswrd.svg?style=flat-square&maxAge=600
    :target: https://github.com/althonos/pyswrd/issues
