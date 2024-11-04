@@ -1,1 +1,1 @@
-cython_extension(_sword LINKS sword)
+cython_extension(lib LINKS sword)

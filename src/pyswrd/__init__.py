@@ -13,8 +13,8 @@ __all__ = [
     "search",
 ]
 
-from . import _sword
-from ._sword import (
+from . import lib
+from .lib import (
     __version__,
     HeuristicFilter,
     KmerGenerator,
@@ -27,7 +27,7 @@ from ._sword import (
     search
 )
 
-__doc__ = _sword.__doc__
+__doc__ = lib.__doc__
 
 # Small addition to the docstring: we want to show a link redirecting to the
 # rendered version of the documentation, but this can only work when Python
