@@ -16,7 +16,7 @@ Classes
 .. toctree::
    :hidden:
 
-   Kmer generator <kmer_generator>
+   Kmer Generator <kmer_generator>
    Scorer <scorer>
    E-value <evalue>
    Sequences <sequences>

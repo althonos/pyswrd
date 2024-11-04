@@ -134,7 +134,9 @@ cdef class KmerGenerator:
     cdef readonly Scorer             scorer
 
     def __init__(self, Scorer scorer, size_t kmer_length = 3, size_t score_threshold = 13):
-        """Create a new k-mer generator.
+        """__init__(self, scorer, kmer_length=3, score_threshold=13)\n--\n
+        
+        Create a new k-mer generator.
 
         Arguments:
             scorer (`~pyswrd.Scorer`): A scorer to use to compute the k-mer
@@ -159,6 +161,8 @@ cdef class Scorer:
     cdef readonly ScoringMatrix            scoring_matrix
 
     def __init__(self, str name = "BLOSUM62", int32_t gap_open = 10, int32_t gap_extend = 1):
+        """__init__(self, name="BLOSUM62", gap_open=10, gap_extend=1)\n--\n
+        """
         cdef _ScoreMatrixType ty
         if name in _SWORD_SCORE_MATRICES:
             ty = <_ScoreMatrixType> <int> _SWORD_SCORE_MATRICES[name]
@@ -236,7 +240,9 @@ cdef class EValue:
     cdef          shared_ptr[_EValue] _evalue
 
     def __init__(self, uint64_t database_size, Scorer scorer):
-        """Create a new E-value calculator.
+        """__init__(self, database_size, scorer)\n--\n
+        
+        Create a new E-value calculator.
 
         Arguments:
             database_size (`int`): The total length of the database,
@@ -288,6 +294,11 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
         self._chains = _ChainSet()
 
     def __init__(self, object sequences=()):
+        """__init__(self, sequences=())\n--\n
+
+        Create a new database of sequences.
+
+        """
         super().__init__(alphabet=_SWORD_ALPHABET)
         self.clear()
         self.extend(sequences)
@@ -493,6 +504,11 @@ cdef class FilterResult:
     cdef          _Indexes _indices
 
     def __init__(self, uint32_t database_size, uint64_t database_length, list entries, list indices):
+        """__init__(self, database_size, database_length, entries, indices)\n--\n
+
+        Create a new filter result.
+
+        """
         self.entries = entries
         self._indices = self.indices = indices
         self.database_size = database_size
@@ -527,7 +543,9 @@ cdef class HeuristicFilter:
         size_t threads = 0,
         object pool = None,
     ):
-        """Create a new heuristic filter.
+        """__init__(self, queries, *, kmer_length=3, max_candidates=30000, score_threshold=13, scorer=None, threads=0, pool=None)\n--\n
+        
+        Create a new heuristic filter.
 
         Arguments:
             queries (`~pyswrd.Sequences`): The queries sequences for which
@@ -872,6 +890,11 @@ cdef class Hit:
     cdef readonly pyopal.lib.FullResult result
 
     def __init__(self, query_index, target_index, evalue, result):
+        """__init__(self, query_index, target_index, evalue, result)\n--\n
+
+        Create a new hit.
+
+        """
         self.query_index = query_index
         self.target_index = target_index
         self.evalue = evalue
