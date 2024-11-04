@@ -931,11 +931,6 @@ def search(
         threads (`int`): The number of threads to use to run the
             pre-filter and alignments. If zero is given, uses the
             number of CPUs reported by `os.cpu_count`.
-        pool (`~multiprocessing.pool.ThreadPool`): A running pool
-            instance to use for parallelization. Useful for reusing
-            the same pool across several calls of `~pyswrd.search`.
-            If `None` given, spawns a new pool based on the ``threads``
-            argument.
 
     Yields:
         `~pyswrd.Hit`: Hit objects for each hit passing the threshold
