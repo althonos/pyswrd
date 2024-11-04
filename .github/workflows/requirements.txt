@@ -5,4 +5,3 @@ scoring-matrices ~=0.3.0
 scikit-build-core
 build
 importlib-resources ; python_version < '3.9'
-biopython           ; implementation_name == 'cpython'
