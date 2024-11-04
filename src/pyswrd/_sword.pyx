@@ -111,6 +111,8 @@ cdef pyopal.lib.Alphabet _SWORD_ALPHABET = pyopal.lib.Alphabet(
     ascii_uppercase
 )
 
+__version__ = PROJECT_VERSION
+
 # --- Python helpers -----------------------------------------------------------
 
 @contextlib.contextmanager
