@@ -1,8 +1,3 @@
-.. pyswrd documentation master file, created by
-   sphinx-quickstart on Sun Jan 28 19:53:52 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 PySWRD |Stars|
 ==============
 
@@ -11,6 +6,8 @@ PySWRD |Stars|
 
 `Cython <https://cython.org/>`_ *bindings and Python interface to* `Opal <https://github.com/Martinsos/opal>`_,
 *a SIMD-accelerated pairwise aligner.*
+
+`Cython <https://cython.org/>`_ *bindings and Python interface to* `SWORD <https://github.com/rvaser/sword>`_ *(Smith Waterman On Reduced Database), a method for fast database search.*
 
 |Actions| |Coverage| |PyPI| |Bioconda| |AUR| |Wheel| |Versions| |Implementations| |License| |Source| |Mirror| |Issues| |Docs| |Changelog| |Downloads|
 
@@ -93,7 +90,7 @@ Setup
 -----
 
 Run ``pip install pyswrd`` in a shell to download the latest release from PyPi, 
-or have a look at the :doc:`Installation page <install>` to find other ways 
+or have a look at the :doc:`Installation page <guide/install>` to find other ways 
 to install ``pyswrd``.
 
 
@@ -103,20 +100,29 @@ Library
 .. toctree::
    :maxdepth: 2
 
-   Installation <install>
-   Contributing <contributing>
+   User Guide <guide/index>
    API Reference <api/index>
-   Changelog <changes>
 
+
+Related Projects
+----------------
+
+The following Python libraries may be of interest for bioinformaticians.
+
+.. include:: related.rst
+   
 
 License
 -------
 
-This library is provided under the `MIT License <https://choosealicense.com/licenses/mit/>`_.
-Opal was developed by `Martin Šošić <https://github.com/Martinsos>`_ and is distributed under the
-terms of the MIT License as well. 
+This library is provided under the `GNU General Public License 3.0 or later <https://choosealicense.com/licenses/gpl-3.0/>`_.
+SWORD was developed by `Robert Vaser <https://github.com/rvaser>`_ and 
+`Dario Pavlovic <https://github.com/darxsys>`_ under the terms of the 
+`GNU General Public License 3.0 or later <https://choosealicense.com/licenses/gpl-3.0/>`_
+as well. See the :doc:`Copyright Notice <guide/copyright>` section
+for the full license.
 
 *This project is in no way not affiliated, sponsored, or otherwise endorsed by
-the original* `Opal`_ *authors. It was developed by* `Martin Larralde <https://github.com/althonos>`_ *during his
+the original* `SWORD`_ *authors. It was developed by* `Martin Larralde <https://github.com/althonos>`_ *during his
 PhD project at the* `European Molecular Biology Laboratory <https://www.embl.de/>`_
 *in the* `Zeller team <https://github.com/zellerlab>`_.

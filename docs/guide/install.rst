@@ -35,19 +35,19 @@ one is available, or from source after compiling the Cython code :
 ..    $ conda install -c bioconda pyswrd
 
 
-.. Arch User Repository
-.. ^^^^^^^^^^^^^^^^^^^^
+Arch User Repository
+^^^^^^^^^^^^^^^^^^^^
 
-.. A package recipe for Arch Linux can be found in the Arch User Repository
-.. under the name `python-pyswrd <https://aur.archlinux.org/packages/python-pyswrd>`_.
-.. It will always match the latest release from PyPI.
+A package recipe for Arch Linux can be found in the Arch User Repository
+under the name `python-pyswrd <https://aur.archlinux.org/packages/python-pyswrd>`_.
+It will always match the latest release from PyPI.
 
-.. Steps to install on ArchLinux depend on your `AUR helper <https://wiki.archlinux.org/title/AUR_helpers>`_
-.. (``yaourt``, ``aura``, ``yay``, etc.). For ``aura``, you'll need to run:
+Steps to install on ArchLinux depend on your `AUR helper <https://wiki.archlinux.org/title/AUR_helpers>`_
+(``yaourt``, ``aura``, ``yay``, etc.). For ``aura``, you'll need to run:
 
-.. .. code:: console
+.. code:: console
 
-..     $ aura -A python-pyswrd
+    $ aura -A python-pyswrd
 
 
 .. Piwheels
@@ -81,11 +81,11 @@ the repository and install the repository by running (with the admin rights):
     which may not even build, so consider using a versioned release instead.
 
 
-GitHub + ``setuptools``
-^^^^^^^^^^^^^^^^^^^^^^^
+GitHub + ``installer``
+^^^^^^^^^^^^^^^^^^^^^^
 
 If you do not want to use ``pip``, you can still clone the repository and
-run the ``setup.py`` file manually, although you will need to install the
+build the package  manually, although you will need to install the
 build dependencies (mainly `Cython <https://pypi.org/project/cython>`_
 and `PyOpal <https://github.com/althonos/pyopal>`_):
 
@@ -93,8 +93,8 @@ and `PyOpal <https://github.com/althonos/pyopal>`_):
 
    $ git clone --recursive https://github.com/althonos/pyswrd
    $ cd pyopal
-   $ python setup.py build_ext
-   # python setup.py install
+   $ python -m build .
+   # python -m installer dist/*.whl
 
 .. Danger::
 

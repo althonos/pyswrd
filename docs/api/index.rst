@@ -16,14 +16,14 @@ Classes
 .. toctree::
    :hidden:
 
-   kmer_generator <kmer_generator>
-   scorer <scorer>
-   evalue <evalue>
-   sequences <sequences>
-   filter_score <filter_score>
-   filter_result <filter_result>
-   heuristic_filter <heuristic_filter>
-   hit <hit>
+   Kmer generator <kmer_generator>
+   Scorer <scorer>
+   E-value <evalue>
+   Sequences <sequences>
+   Filter Score <filter_score>
+   Filter Result <filter_result>
+   Heuristic Filter <heuristic_filter>
+   Hit <hit>
 
 
 .. only:: html
