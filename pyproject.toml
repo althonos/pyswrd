@@ -77,7 +77,7 @@ build-frontend = { name = "pip", args = ["--no-build-isolation"] }
 build-verbosity = 1
 free-threaded-support = false
 test-command = "python -m unittest pyswrd.tests -v"
-test-requires = ["importlib-resources"]
+test-extras = ["test"]
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
