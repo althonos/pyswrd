@@ -6,7 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 
 ## [Unreleased]
-[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.3.0-post1...HEAD
+
+
+## [v0.3.0-post1] - 2025-03-04
+[v0.3.0-post1]: https://github.com/althonos/pyswrd/compare/v0.3.0...v0.3.0-post1
+
+### Fixed
+- Extra key in `pyproject.toml` causing build issues with version `0.11.0` of `scikit-build-core`.
 
 
 ## [v0.3.0] - 2024-11-04
