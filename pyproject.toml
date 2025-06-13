@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pyswrd"
-version = "0.3.0-post1"
+version = "0.3.1"
 description = "Cython bindings and Python interface to SWORD (Smith Waterman On Reduced Database), a heuristic method for fast database search. "
 readme = "README.md"
 requires-python = ">=3.7"
@@ -55,7 +55,12 @@ test = ["importlib-resources ; python_version < '3.9'"]
 build-dir = "build/{build_type}"
 editable.rebuild = true
 editable.verbose = false
-sdist.exclude = ["src/pyswrd/tests/data/uniprot_sprot12071.fasta", "vendor/sword/vendor/opal/test_data/db/uniprot_sprot12071.fasta"]
+wheel.exclude = ["docs"]
+sdist.exclude = [
+    "docs",
+    "src/pyswrd/tests/data/uniprot_sprot12071.fasta", 
+    "vendor/sword/vendor/opal/test_data/db/uniprot_sprot12071.fasta"
+]
 
 [[tool.scikit-build.overrides]]
 if.state = "editable"
@@ -74,7 +79,6 @@ cmake.define.CMAKE_LINKER_TYPE = "mold"
 before-build = "pip install scikit-build-core cython scoring-matrices pyopal"
 build-frontend = { name = "pip", args = ["--no-build-isolation"] }
 build-verbosity = 1
-free-threaded-support = false
 test-command = "python -m unittest pyswrd.tests -v"
 test-extras = ["test"]
 
