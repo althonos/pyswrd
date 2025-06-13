@@ -18,7 +18,7 @@ jobs:
       uses: pypa/cibuildwheel@v2.21.3
       env:
         CIBW_ARCHS: aarch64
-        CIBW_BUILD: '*-manylinux_aarch64'
+        CIBW_BUILD: 'cp*-manylinux_aarch64'
         CIBW_BUILD_VERBOSITY: 2
       with:
         output-dir: dist
@@ -38,7 +38,7 @@ jobs:
       uses: pypa/cibuildwheel@v2.21.3
       env:
         CIBW_ARCHS: x86_64
-        CIBW_BUILD: '*-manylinux_x86_64'
+        CIBW_BUILD: 'cp*-manylinux_x86_64'
         CIBW_BUILD_VERBOSITY: 2
       with:
         output-dir: dist
@@ -58,7 +58,7 @@ jobs:
       uses: pypa/cibuildwheel@v2.21.3
       env:
         CIBW_ARCHS: x86_64
-        CIBW_BUILD: '*-macosx_x86_64'
+        CIBW_BUILD: 'cp*-macosx_x86_64'
         CIBW_BUILD_VERBOSITY: 2
       with:
         output-dir: dist
@@ -78,7 +78,7 @@ jobs:
       uses: pypa/cibuildwheel@v2.21.3
       env:
         CIBW_ARCHS: arm64
-        CIBW_BUILD: '*-macosx_arm64'
+        CIBW_BUILD: 'cp*-macosx_arm64'
         CIBW_BUILD_VERBOSITY: 2
         CIBW_TEST_SKIP: "*-macosx_arm64"
       with:
@@ -103,7 +103,7 @@ jobs:
       uses: pypa/cibuildwheel@v2.21.3
       env:
         CIBW_ARCHS: AMD64
-        CIBW_BUILD: '*-win_amd64'
+        CIBW_BUILD: 'cp*-win_amd64'
         CIBW_BUILD_VERBOSITY: 2
         CMAKE_GENERATOR: Ninja
       with:
