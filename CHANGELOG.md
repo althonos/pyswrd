@@ -6,7 +6,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 
 ## [Unreleased]
-[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.3.0-post1...HEAD
+[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.3.1...HEAD
+
+
+## [v0.3.1] - 2025-06-13
+[v0.3.1]: https://github.com/althonos/pyswrd/compare/v0.3.0-post1...v0.3.1
+
+### Fixed
+- Missing header include in `reader.hpp` file of SWORD.
 
 
 ## [v0.3.0-post1] - 2025-03-04
