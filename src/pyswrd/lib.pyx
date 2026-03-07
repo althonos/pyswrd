@@ -1,5 +1,5 @@
 # distutils: language = c++
-# cython: language_level=3, linetrace=True, binding=True, embedsignature=False
+# cython: language_level=3, binding=True, embedsignature=False
 """Bindings to SWORD, a heuristic method for sequence database search.
 
 References:
