@@ -176,7 +176,7 @@ cdef class Scorer:
             )
         )
 
-        cdef int* scores = self._sm.get().data()
+        cdef const int* scores = self._sm.get().data()
         self.scoring_matrix = ScoringMatrix(
             alphabet=_SWORD_ALPHABET.letters,
             name=name,
@@ -201,7 +201,7 @@ cdef class Scorer:
             buffer.format = b"i"
         else:
             buffer.format = NULL
-        buffer.buf = self._sm.get().data()
+        buffer.buf = <void*> self._sm.get().data()
         buffer.internal = NULL
         buffer.itemsize = sizeof(int)
         buffer.len = sword.score_matrix.num_rows_ * sword.score_matrix.num_columns_ * sizeof(int)
