@@ -6,7 +6,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 
 ## [Unreleased]
-[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/althonos/pyswrd/compare/v0.3.2...HEAD
+
+
+## [v0.3.2] - 2026-11-05
+[v0.3.2]: https://github.com/althonos/pyswrd/compare/v0.3.1...v0.3.2
+
+### Added
+- Support for WebAssembly platforms using Pyodide and Emscripten.
+
+### Changed
+- Compile and distribute ABI3 wheels with Python Limited API 3.11.
+
+### Fixed
+- Linetrace being enabled by default even in release builds.
 
 
 ## [v0.3.1] - 2025-06-13

@@ -119,7 +119,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        submodules: true
+        submodules: recursive
     - name: Set up Python 3.13
       uses: actions/setup-python@v2
       with:
@@ -131,9 +131,9 @@ jobs:
     - name: Create virtualenv
       run: pyodide venv .venv-pyodide
     - name: Install WebAssembly wheel
-      run: .venv-pyodide/bin/pip install dist/pycdhit-*.whl
+      run: .venv-pyodide/bin/pip install dist/pyswrd-*.whl
     - name: Run tests
-      run: .venv-pyodide/bin/python -m unittest pycdhit.tests -vv
+      run: .venv-pyodide/bin/python -m unittest pyswrd.tests -vv
     - uses: actions/upload-artifact@v4
       with:
         name: wheels-wasm
