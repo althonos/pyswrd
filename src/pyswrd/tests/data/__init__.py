@@ -1,6 +1,7 @@
 import contextlib
 import gzip
 import io
+import os
 
 try:
     try:
@@ -14,13 +15,14 @@ from ..fasta import parse, zopen
 
 
 def exists(name):
-    return files(__name__).joinpath(name).exists()
+    return files(__name__).joinpath(name).is_file()
 
 
 @contextlib.contextmanager
 def load(name, mode="rb"):
-    with zopen(files(__name__).joinpath(name), mode=mode) as src:
-        yield src
+    with files(__name__).joinpath(name).open(mode="rb") as src:
+        with zopen(src, mode=mode) as reader:
+            yield reader
 
 
 def load_record(name):

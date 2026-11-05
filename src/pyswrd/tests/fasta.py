@@ -16,11 +16,14 @@ _ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
 def zopen(file, mode="r", encoding=None, errors=None, newline=None):
     with contextlib.ExitStack() as ctx:
 
-        try:
-            path = os.fsencode(file)
-            file = ctx.enter_context(open(path, mode="rb"))
-        except TypeError:
-            raise
+        if not hasattr(file, "read") and not hasattr(file, "write"):
+            try:
+                path = os.fsencode(file)
+                file = ctx.enter_context(open(path, mode="rb"))
+            except TypeError:
+                raise
+        elif not hasattr(file, "peek"):
+            file = ctx.enter_context(io.BufferedReader(file))
 
         peek = file.peek()
         if peek.startswith(_GZIP_MAGIC):
