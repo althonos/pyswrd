@@ -355,13 +355,16 @@ cdef class Sequences(pyopal.lib.BaseDatabase):
             ['ATGC', 'TTCA', 'AAAA']
 
         """
-        cdef bytes              seq
-        cdef shared_ptr[_Chain] chain
-        cdef uint32_t           total = self._chains.size()
-        cdef bytes              name  = str(total).encode()
+        cdef const unsigned char[::1] seq
+        cdef shared_ptr[_Chain]       chain
+        cdef uint32_t                 total = self._chains.size()
+        cdef bytes                    name  = str(total).encode()
 
-        seq = sequence.encode('ascii') if isinstance(sequence, str) else sequence
-        chain = shared_ptr[_Chain](sword.chain.createChain(total, name, len(name), seq, len(seq)))
+        if isinstance(sequence, str):
+            sequence = sequence.encode('ascii')
+
+        seq = sequence
+        chain = shared_ptr[_Chain](sword.chain.createChain(total, name, len(name), <char*> &seq[0], seq.shape[0]))
 
         with self.lock.write:
             self._lengths.push_back(chain.get().length())
