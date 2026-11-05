@@ -993,6 +993,7 @@ def search(
     cdef pyopal.lib.ScoreResult         score_result
     cdef pyopal.lib.FullResult          target_result
     cdef vector[pair[uint32_t, double]] target_evalues
+    cdef list                           hits = []
 
     if threads == 0:
         threads = os.cpu_count() or 1
@@ -1046,9 +1047,11 @@ def search(
             ali_results = align(query, sub_db, algorithm=algorithm, mode="full", scoring_matrix=scoring_matrix, gap_open=gap_open, gap_extend=gap_extend, threads=threads, pool=pool, ordered=True)
             # return hits for aligned sequences
             for (target_index, target_evalue), target_result in zip(target_evalues, ali_results):
-                yield Hit(
+                hits.append(Hit(
                     query_index=query_index,
                     target_index=target_index,
                     evalue=target_evalue,
                     result=target_result
-                )
+                ))
+    
+    return hits
