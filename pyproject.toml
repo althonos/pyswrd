@@ -8,7 +8,8 @@ version = "0.3.1"
 description = "Cython bindings and Python interface to SWORD (Smith Waterman On Reduced Database), a heuristic method for fast database search. "
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "COPYING" }
+license = "GPL-3.0-or-later"
+license-files = ["COPYING"]
 authors = [
   { name = "Martin Larralde", email = "martin.larralde@embl.de" },
 ]
@@ -17,7 +18,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
     "Programming Language :: C++",
     "Programming Language :: Cython",
@@ -53,6 +53,7 @@ test = ["importlib-resources ; python_version < '3.9'"]
 
 [tool.scikit-build]
 build-dir = "build/{build_type}"
+wheel.py-api = "cp311"
 editable.rebuild = true
 editable.verbose = false
 wheel.exclude = ["docs"]
@@ -66,6 +67,10 @@ sdist.exclude = [
 if.state = "editable"
 cmake.build-type = "Debug"
 
+[[tool.scikit-build.overrides]]
+if.env.READTHEDOCS = "True"
+cmake.build-type = "Debug"
+
 [[tool.scikit-build-overrides]]
 if.env.SCCACHE = true
 cmake.define.CMAKE_C_COMPILER_LAUNCHER = "sccache"
@@ -74,6 +79,11 @@ cmake.define.CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
 [[tool.scikit-build-overrides]]
 if.env.MOLD = true
 cmake.define.CMAKE_LINKER_TYPE = "mold"
+
+[[tool.scikit-build.overrides]]
+if.env.PYODIDE = "1"
+cmake.define.CMAKE_C_COMPILER_TARGET = "wasm32"
+cmake.define.CMAKE_SYSTEM_PROCESSOR = "wasm32"
 
 [tool.cibuildwheel]
 before-build = "pip install scikit-build-core cython scoring-matrices pyopal"
