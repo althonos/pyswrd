@@ -1,4 +1,5 @@
 import unittest
+import platform
 
 from .. import HeuristicFilter, Sequences
 from . import data
@@ -46,6 +47,7 @@ class TestHeuristicFilter(_TestFilter, unittest.TestCase):
 
     @unittest.skipUnless(data.exists("O74807.fasta"), "missing data file")
     @unittest.skipUnless(data.exists("uniprot_sprot15.fasta"), "missing data file")
+    @unittest.skipIf(platform.system() == "Emscripten", "cannot use multithreading with Emscripten")
     def test_chunks_threads(self):
         f1 = HeuristicFilter(self.o74807, threads=4)
         r1 = f1.score(self.sprot15).finish()
